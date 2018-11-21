@@ -29,6 +29,13 @@ class Map:
         _pos = _node.get_pos()
         self.m_draw.del_point(_pos[0], _pos[1])     
 
+    def init_edge(self, _node_list):
+        for node1 in _node_list:
+            for node2 in _node_list:
+                if node1 is not node2:
+                    if node1.can_touch(node2):
+                        self.m_draw.add_edge(node1.get_pos(), node2.get_pos())
+
     def show_loop(self):
         self.m_draw.show_loop()
         

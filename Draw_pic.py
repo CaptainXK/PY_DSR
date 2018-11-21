@@ -1,5 +1,7 @@
-import Tkinter
-from Tkinter import *
+# import Tkinter
+# from Tkinter import *
+import tkinter
+from tkinter import *
 
 class Draw_map:
     m_tk=None
@@ -22,6 +24,15 @@ class Draw_map:
     
     def del_point(self, _x, _y, _col = 'white'):
         self.put_point(_x, _y, _col)
+    
+    def add_edge(self, _pos_1, _pos_2, _col='red'):
+        print("edge:(%d, %d)---(%d, %d)"%(_pos_1[0], _pos_1[1], _pos_2[0], _pos_2[1]) )
+        self.m_canvas.create_line(_pos_1[0], _pos_1[1], _pos_2[0], _pos_2[1], fill=_col)
+        self.m_tk.update()
+    
+    def del_edge(self, _pos_1, _pos_2, col='while'):
+        self.add_edge(self, _pos_1, _pos_2, col)
+
 
     def show_loop(self):
         self.m_tk.mainloop()

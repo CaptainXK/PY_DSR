@@ -1,22 +1,37 @@
+from Pipe import *
+
 class Connect:
-    m_tar_node=None
-    m_snd_pipe=None
-    m_rcv_pipe=None
+    m_in_use=False
+    m_nodes={}
+    m_1to2_pipe=None
+    m_2to1_pipe=None
 
-    def __init__(self, _node, _snd_pipe, _rcv_pipe):
-        self.m_tar_node = _node
-        self.m_snd_pip = _snd_pipe
-        self.m_rcv_pip = _rcv_pipe 
-    
-    def get_snd_pipe(self):
-        return self.m_snd_pipe
-    
-    def get_rcv_pipe(self):
-        return self.m_rcv_pipe
-    
-    def get_tar_node(self):
-        return self.m_tar_node
+    def __init__(self):
+        self.m_1to2_pip = Pipe()
+        self.m_2to1_pip = Pipe()
+        self.m_in_use = False
 
+    def set_nodes(self, _id_1, _id_2):
+        self.m_nodes[_id_1] = 1
+        self.m_nodes[_id_2] = 2
+        self.m_in_use = True
+
+    
+    def get_snd_pipe(self, _id):
+        if self.m_nodes[_id] == 1:
+            return self.m_1to2_pipe
+        else:
+            return self.m_2to1_pipe
+    
+    def get_rcv_pipe(self, _id):
+        if self.m_nodes[_id] == 1:
+            return self.m_2to1_pipe
+        else:
+            return self.m_1to2_pipe
+    
+    def is_in_use(self):
+        return self.m_in_use
+    
 class Msg:
     m_route_list=[]
     m_content=''
@@ -45,6 +60,11 @@ class Route_path:
 
     def add_node(self, _node):
         self.m_nodes_list.append(_node)
+        self.m_nodes_nb += 1
+    
+    def init_by_nodes(self, _nodes_list):
+        for _node in _nodes_list:
+            self.add_node(_node)
     
     def find_next_hop(self, _node):
         idx = 0
@@ -58,5 +78,6 @@ class Route_path:
 
         return _next_node
 
-# def cal_routes(_map, _src, _dst):
-#     #BFS to find all route available
+    def show_route(self):
+        for _node in self.m_nodes_list:
+            print("%d"%(_node.get_id()), end=' ')

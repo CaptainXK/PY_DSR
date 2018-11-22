@@ -32,6 +32,12 @@ class Connect:
     def is_in_use(self):
         return self.m_in_use
     
+    def close_con(self):
+        self.m_in_use = False
+    
+    def open_con(self):
+        self.m_in_use = True
+    
 class Msg:
     m_route_list=[]
     m_content=''
@@ -81,3 +87,4 @@ class Route_path:
     def show_route(self):
         for _node in self.m_nodes_list:
             print("%d"%(_node.get_id()), end=' ')
+        print("")

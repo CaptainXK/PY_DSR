@@ -28,16 +28,28 @@ class Draw_map:
         _col = 'green'
         self.put_point(_x, _y, _col)
     
+    #delete a point
     def del_point(self, _x, _y, _col = 'white'):
         self.put_point(_x, _y, _col)
     
+    #add a edge
     def add_edge(self, _pos_1, _pos_2, _col='red', _dash=None):
         print("edge:(%d, %d)---(%d, %d)"%(_pos_1[0], _pos_1[1], _pos_2[0], _pos_2[1]) )
         self.m_canvas.create_line(_pos_1[0], _pos_1[1], _pos_2[0], _pos_2[1], fill=_col, dash=_dash)
         self.m_tk.update()
     
+    #delete a edge
     def del_edge(self, _pos_1, _pos_2, col='while'):
         self.add_edge(_pos_1, _pos_2, col)
 
+    #keep map visiable
     def show_loop(self):
         self.m_tk.mainloop()
+
+    #remove all
+    def remove_all(self):
+        self.m_canvas.delete("all")
+
+    #bind double-click event
+    def bind_dbc(self, call_back):
+        self.m_canvas.bind("<Double-Button-1>", call_back)

@@ -25,6 +25,22 @@ class Map:
         self.m_nodes_nb = 0
         self.m_nodes_list = []
         self.m_con_pool = [Connect() for i in range(100)]
+        self.m_draw
+        #bind double click function
+        self.m_draw.bind_dbc(self.del_node)
+
+
+    def update_all(self):
+        self.m_draw.remove_all()
+        self.put_nodes(self.m_nodes_list)
+        self.init_edge()
+        src_id = 0
+        dst_id = len(self.m_nodes_list) - 1
+        self.cal_route(self.m_nodes_list[src_id], self.m_nodes_list[dst_id])   
+
+    def init_all_con(self):
+        for con in self.m_con_pool:
+            con.close_con()
     
     def get_size(self):
         return [self.m_w, self.m_h]
@@ -35,24 +51,41 @@ class Map:
     
     def put_nodes(self, _node_list):
         self.m_nodes_list = _node_list
-        self.m_nodes_nb = len(_node_list)
 
         # draw nodes one by one 
+        # ignore node un-work
         for _node in _node_list:
-            self.put_node(_node)
-            self.m_nodes_nb += 1
+            if _node.is_work():
+                self.put_node(_node)
+                self.m_nodes_nb += 1
 
-    def del_node(self, _node):
-        _pos = _node.get_pos()
-        self.m_draw.del_point(_pos[0], _pos[1])     
+    #double click event
+    def del_node(self, event):
+        _x = event.x
+        _y = event.y
+        print("Double click event on (%d, %d)"%(_x, _y))
+        idx = 0
+        for _node in self.m_nodes_list:
+            if _node.under_cover(_x, _y):
+                print("Remove %s"%(_node.get_name()))
+                _node.go_die()
+                break
+        self.update_all()
 
     def init_edge(self):
+        
         _node_list = self.m_nodes_list
+
+        #init all edges
+        self.m_edges.clear()
+
+        #inie all con
+        self.init_all_con()
 
         # find all node pairs where two nodes can touch each other
         for node1 in _node_list:
             for node2 in _node_list:
-                if node1 is not node2:
+                if (node1 is not node2) and node1.is_work() and node2.is_work():
                     if node1.can_touch(node2):
                         # avoid duplicate edge, like "a->b" and "b->a"
                         if not ((node1, node2) in self.m_edges or (node2, node1) in self.m_edges):
@@ -63,6 +96,7 @@ class Map:
                                     con.set_nodes(node1.get_id(), node2.get_id())
                                     node1.add_connect(con, node2)
                                     node2.add_connect(con, node1)
+                                    con.open_con()
                                     break
 
     def del_edge(self, _node1, _node2):
@@ -73,6 +107,8 @@ class Map:
                 return 1
             else:
                 idx += 1
+
+        self.m_draw.del_edge(_node1.get_pos(), _node2.get_pos())
         
         return 0
 
@@ -106,16 +142,18 @@ class Map:
 
             for _next_hop_node in next_nodes:
                 # avoid loop
-                if not _next_hop_node in pre_dist.keys():
+                if (not _next_hop_node in pre_dist.keys()) and _next_hop_node.is_work():
                     pre_dist[_next_hop_node] = cur_node
 
                     #new next hop node enqueue
                     nodes_queue.put(_next_hop_node)
 
+        if not (cur_node is _dst_node):
+            print("No available route Path!")
+            return  
+
         # trace back the whole route
         nodes_in_route = []
-
-        cur_node = _dst_node
 
         while not cur_node is None:
             nodes_in_route.append(cur_node)

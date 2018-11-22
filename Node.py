@@ -19,6 +19,7 @@ class Node:
     m_rcv_buf=None
     m_connects=None
     m_id=0
+    m_point_sz=5
 
     
     def __init__(self, _name, _x, _y, _range):
@@ -35,6 +36,7 @@ class Node:
         self.m_connects = {}
         self.m_is_work=True
         self.m_id = int(re.search(r'(\d)', _name, re.I).group(0))
+        self.m_point_sz=5
         print("name=%s, id=%d, x=%d, y=%d, r=%d"%(self.m_name, self.m_id, self.m_x, self.m_y, self.m_range))
     
     def go_die(self):
@@ -42,6 +44,9 @@ class Node:
     
     def get_id(self):
         return self.m_id
+
+    def get_name(self):
+        return self.m_name
     
     def get_pos(self):
         return [self.m_x, self.m_y]
@@ -83,11 +88,29 @@ class Node:
     #add a new connection working as FIB
     def add_connect(self, _connect, _tar_node):
         self.m_connects[_tar_node] = _connect
+    
+    #delete a connect
+    def del_connect(self, _tar_node):
+        del self.m_connects[_tar_node]
 
+    #get one connect
     def get_connect(self, _tar_node):
         return self.m_connects[_tar_node]
     
+    #get all connects
     def get_connects(self):
         return self.m_connects
+
+    def is_work(self):
+        return self.m_is_work
+
+    def under_cover(self, _x, _y):
+        _dis = math.sqrt((pow(abs(_x - self.m_x), 2) + pow(abs(_y - self.m_y), 2)) )
+        _dis = int(_dis)
+
+        if _dis <= self.m_point_sz:
+            return True
+        else:
+            return False
     
     # def main_loop(self, _connect):

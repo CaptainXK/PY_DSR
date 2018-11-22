@@ -1,14 +1,37 @@
 import math
+from queue import *
+from Pipe import *
+from Route import *
+import re
 
 class Node:
+    m_is_work=True
     m_x=0
     m_y=0
     m_range=0
+    m_name=''
+    m_snd_buf=None
+    m_rcv_buf=None
+    m_connects=None
+    m_id=0
     
-    def __init__(self, _x, _y, _range):
+    def __init__(self, _name, _x, _y, _range):
         self.m_x = _x
         self.m_y = _y
         self.m_range = _range
+        self.m_name = _name
+        self.m_snd_buf = Queue() 
+        self.m_rcv_buf = Queue()
+        #next hop dist
+        self.m_connects = {}
+        self.m_is_work=True
+        self.m_id = int(re.search(r'(\d)', _name, re.I).group(0))
+    
+    def go_die(self):
+        self.m_is_work = False
+    
+    def get_id(self):
+        return self.m_id
     
     def get_pos(self):
         return [self.m_x, self.m_y]
@@ -28,3 +51,28 @@ class Node:
             return True
         else:
             return False
+    #sendmsg
+    def send_msg(self, _tar_node, _msg):
+        #send msg from snd_buf
+        _snd_pipe = self.m_connects[_tar_node].get_snd_pipe()
+        _snd_pipe.__send__(_msg)
+    
+    #recv
+    def recv_msg(self, _tar_node):
+        #recv msg to rcv_buf
+        _rcv_pipe = self.m_connects[_tar_node].get_rcv_pipe()
+        return _rcv_pipe.__recv__()
+
+    #load msg to snd_buf
+    def load_msgs(self, _msgs):
+        for _msg in _msgs:
+            self.m_snd_buf.put(_msg)
+        
+        return len(self.m_snd_buf)
+
+    #add a new connection working as FIB
+    def add_connect(self, _connect):
+        _tar_node = _connect.get_tar_node()
+        self.m_connects[_tar_node] = _connect
+    
+    # def main_loop(self, _connect):

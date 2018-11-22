@@ -11,9 +11,10 @@ class Draw_map:
 
     def __init__(self, _w, _h, _bg = 'white'):
         self.m_tk = Tk()
+        self.m_tk.title('DSR simulation')
         self.m_canvas = Canvas(self.m_tk, width = _w, height = _h, bg=_bg)
         self.m_bg = _bg
-        self.m_point_size = 3
+        self.m_point_size = 5
         self.m_canvas.pack()
 
     #circle : center point (_x, _y) ,R=_r
@@ -25,14 +26,13 @@ class Draw_map:
     def del_point(self, _x, _y, _col = 'white'):
         self.put_point(_x, _y, _col)
     
-    def add_edge(self, _pos_1, _pos_2, _col='red'):
+    def add_edge(self, _pos_1, _pos_2, _col='red', _dash=None):
         print("edge:(%d, %d)---(%d, %d)"%(_pos_1[0], _pos_1[1], _pos_2[0], _pos_2[1]) )
-        self.m_canvas.create_line(_pos_1[0], _pos_1[1], _pos_2[0], _pos_2[1], fill=_col)
+        self.m_canvas.create_line(_pos_1[0], _pos_1[1], _pos_2[0], _pos_2[1], fill=_col, dash=_dash)
         self.m_tk.update()
     
     def del_edge(self, _pos_1, _pos_2, col='while'):
-        self.add_edge(self, _pos_1, _pos_2, col)
-
+        self.add_edge(_pos_1, _pos_2, col)
 
     def show_loop(self):
         self.m_tk.mainloop()

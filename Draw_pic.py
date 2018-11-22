@@ -22,6 +22,11 @@ class Draw_map:
         _r = self.m_point_size
         self.m_canvas.create_oval(_x-_r, _y-_r, _x+_r, _y+_r, fill=_col)
         self.m_tk.update()
+
+    #change point stat
+    def mod_point(self, _x, _y):
+        _col = 'green'
+        self.put_point(_x, _y, _col)
     
     def del_point(self, _x, _y, _col = 'white'):
         self.put_point(_x, _y, _col)

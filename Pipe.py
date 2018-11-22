@@ -1,6 +1,5 @@
 import threading
 from queue import *
-from Route import *
 
 class Pipe:
     rw_lock=None

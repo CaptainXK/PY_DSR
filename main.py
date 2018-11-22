@@ -33,7 +33,7 @@ def load_nodes(_file, _nodes_list):
 
     for _data_items in _datas:
         _data = _data_items.split(' ')
-        print("name=%s, x=%d, y=%d, range=%d"%(_data[0], int(_data[1]), int(_data[2]), int(_data[3])))
+        # print("name=%s, x=%d, y=%d, range=%d"%(_data[0], int(_data[1]), int(_data[2]), int(_data[3])))
         node_tmp = Node(_data[0], int(_data[1]), int(_data[2]), int(_data[3]))
         _nodes_list.append(node_tmp)
 
@@ -69,7 +69,12 @@ def __main__():
 
     _map.put_nodes(nodes_list)
 
-    _map.init_edge(nodes_list)
+    _map.init_edge()
+
+    src_id = 0
+    dst_id = len(nodes_list) - 1
+
+    _map.cal_route(nodes_list[src_id], nodes_list[dst_id])
 
     _map.show_loop()
 

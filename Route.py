@@ -86,6 +86,13 @@ class Route_path:
             print("%d"%(_node.get_id()), end=' ')
         print("")
 
+    #is in route
+    def is_in(self, _node):
+        if _node in self.m_nodes_list:
+            return True
+        else:
+            return False
+
 class Msg:
     m_content=''
     m_route_info=None

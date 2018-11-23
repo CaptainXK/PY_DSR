@@ -1,5 +1,5 @@
-from Node import *
-from Map import *
+from Node import Node
+from Map import Map
 import sys
 import getopt
 
@@ -20,7 +20,7 @@ def cmd_parse_file(args):
             _file = arg
         else:
             print("Option error")
-            sys.exit(1)
+            sys.exit(1) 
 
     return _file
 
@@ -75,6 +75,8 @@ def __main__():
     dst_id = len(nodes_list) - 1
 
     _map.cal_route(nodes_list[src_id], nodes_list[dst_id])
+
+    _map.start_all_nodes()
 
     _map.show_loop()
 

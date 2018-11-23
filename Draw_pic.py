@@ -16,7 +16,7 @@ class Draw_map:
         self.m_canvas = Canvas(self.m_tk, width = _w, height = _h, bg=_bg)
         self.m_btn_stop = Button(self.m_tk, text='Stop')
         self.m_bg = _bg
-        self.m_point_size = 5
+        self.m_point_size = 7
         self.m_canvas.pack()
         self.m_btn_stop.pack()
 
@@ -27,8 +27,7 @@ class Draw_map:
         self.m_tk.update()
 
     #change point stat
-    def mod_point(self, _x, _y):
-        _col = 'green'
+    def mod_point(self, _x, _y, _col = 'red'):
         self.put_point(_x, _y, _col)
     
     #delete a point
@@ -36,9 +35,14 @@ class Draw_map:
         self.put_point(_x, _y, _col)
     
     #add a edge
-    def add_edge(self, _pos_1, _pos_2, _col='red', _dash=None):
-        print("edge:(%d, %d)---(%d, %d)"%(_pos_1[0], _pos_1[1], _pos_2[0], _pos_2[1]) )
-        self.m_canvas.create_line(_pos_1[0], _pos_1[1], _pos_2[0], _pos_2[1], fill=_col, dash=_dash)
+    def add_edge(self, _pos_1, _pos_2, _col='black', _dash=None):
+        # print("edge:(%d, %d)---(%d, %d)"%(_pos_1[0], _pos_1[1], _pos_2[0], _pos_2[1]) )
+        _width = 1
+        
+        if _dash is None:
+            _width = 3
+        
+        self.m_canvas.create_line(_pos_1[0], _pos_1[1], _pos_2[0], _pos_2[1], fill=_col, width=_width, dash=_dash)
         self.m_tk.update()
     
     #delete a edge

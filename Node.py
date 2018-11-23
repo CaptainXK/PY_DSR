@@ -123,6 +123,10 @@ class Node:
     def set_route(self, _route, _dst_node):
         self.m_route[_dst_node] = _route
 
+    #get route
+    def get_route(self):
+        return self.m_route
+
     #check if node is on working
     def is_work(self):
         return self.m_is_work
@@ -130,6 +134,7 @@ class Node:
     #just go die    
     def go_die(self):
         self.m_is_work = False
+        self.stop_node()
 
     #check if node is on runing
     def is_run(self):
@@ -141,8 +146,9 @@ class Node:
     
     #stop running
     def stop_node(self):
-        print("%s stop running"%(self.get_name()))
-        self.m_is_run = False
+        if self.is_run():
+            print("%s stop running"%(self.get_name()))
+            self.m_is_run = False
 
     #check if the given pos(_x, _y) is on node
     def under_cover(self, _x, _y):
@@ -186,7 +192,12 @@ class Node:
         cur_time = 0
         msg_idx = 0
 
-        while self.is_run():
+        while self.is_run() and self.is_work():
+            
+            # if map is in rebuild, keep waiting
+            while _map.is_in_rebuild():
+                continue
+        
             # update cur_time
             cur_time = datetime.datetime.now()
 
@@ -235,7 +246,12 @@ class Node:
 
     # forwarder loop
     def fwd_loop(self, _map):
-        while self.is_run():
+        while self.is_run() and self.is_work():
+            
+            # if map is in rebuild, keep waiting
+            while _map.is_in_rebuild():
+                continue
+            
             # poll all connects to rcv
             for (_pre_node, _connect) in self.m_connects.items():
                 if _pre_node.is_work():
@@ -291,7 +307,12 @@ class Node:
 
     # receiver loop
     def rcv_loop(self, _map):
-        while self.is_run():
+        while self.is_run() and self.is_work():
+            
+            # if map is in rebuild, keep waiting
+            while _map.is_in_rebuild():
+                continue
+            
             # poll all connects to rcv
             for (_pre_node, _connect) in self.m_connects.items():
                 if _pre_node.is_work():

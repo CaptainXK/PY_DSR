@@ -16,6 +16,7 @@ class Map:
     m_con_pool = []
     m_cur_src=None
     m_cur_dst=None
+    m_is_in_rebuild=False
 
     #constructor
     def __init__(self, _w, _h):
@@ -28,6 +29,7 @@ class Map:
         self.m_nodes_nb = 0
         self.m_nodes_list = []
         self.m_con_pool = [Connect() for i in range(100)]
+        self.m_is_in_rebuild=False
 
         #bind double click function
         self.m_draw.bind_dbc(self.del_node)
@@ -38,14 +40,51 @@ class Map:
         #bind stop
         self.m_draw.bind_btn_stop(self.stop_all_nodes_callback)
 
+    # rebuild map
+    def do_rebuild(self):
+        self.m_is_in_rebuild = True
+    
+    def done_rebuild(self):
+        self.m_is_in_rebuild = False
+    
+    def is_in_rebuild(self):
+        return self.m_is_in_rebuild
+
     # update before network rebuild anytime
-    def update_all(self):
+    def update_all(self, _del_node):
+        # rebuild
+        self.do_rebuild()
+
         self.m_draw.remove_all()
-        self.put_nodes(self.m_nodes_list)
         self.init_edge()
-        src_id = 0
-        dst_id = len(self.m_nodes_list) - 1
-        self.cal_route(self.m_nodes_list[src_id], self.m_nodes_list[dst_id])   
+
+        # # delete all edge consisting of un-work node
+        # for [_node1, _node2] in self.m_edges:
+        #     if _del_node in [_node1, _node2]:
+        #         self.del_edge(_node1, _node2)
+        
+        # get current route info of src node
+        _cur_src_route_dict = self.get_global_src().get_route()
+        _cur_src_route = _cur_src_route_dict[self.get_global_dst()]
+
+        # check if deleted node is in the route path
+        if _cur_src_route.is_in(_del_node):
+            #re-build and re-draw route
+            nodes_in_path = _cur_src_route.get_nodes_in_path()
+            idx = 0
+            while idx < ( len(nodes_in_path) - 1):
+                self.del_edge(nodes_in_path[idx], nodes_in_path[idx+1])
+                idx += 1
+
+            self.cal_route(self.get_global_src(), self.get_global_dst()) 
+        else:
+            # just re-draw route
+            self.re_draw_route(_cur_src_route.get_nodes_in_path())
+        
+        self.put_nodes()
+
+        # rebuild done
+        self.done_rebuild()
 
     # reset all connect in connect pool
     def init_all_con(self):
@@ -59,6 +98,11 @@ class Map:
     # get size of current map
     def get_size(self):
         return [self.m_w, self.m_h]
+
+    # load nodes
+    def load_nodes(self, _nodes_list):
+        self.m_nodes_list = _nodes_list
+        self.m_nodes_nb = len(_nodes_list)
     
     # put a node onto map by its pos
     def put_node(self, _node):
@@ -66,15 +110,12 @@ class Map:
         self.m_draw.put_point(_pos[0], _pos[1])
     
     # put nodes from given nodes' list
-    def put_nodes(self, _node_list):
-        self.m_nodes_list = _node_list
-
+    def put_nodes(self):
         # draw nodes one by one 
         # ignore node un-work
-        for _node in _node_list:
+        for _node in self.m_nodes_list:
             if _node.is_work():
                 self.put_node(_node)
-                self.m_nodes_nb += 1
 
     # double click event
     def del_node(self, event):
@@ -83,11 +124,23 @@ class Map:
         print("Double click event on (%d, %d)"%(_x, _y))
         for _node in self.m_nodes_list:
             if _node.under_cover(_x, _y):
-                print("Remove %s"%(_node.get_name()))
+
+                if _node is self.get_global_src():
+                    print("Can not delete src node")
+                    return
+                elif _node is self.get_global_dst():
+                    print("Can not delete dst node")
+                    return
+                else:
+                    print("Remove %s"%(_node.get_name()))
+                
                 _node.go_die()
                 _node.stop_node()
+                _node_pos = _node.get_pos()
+                self.get_draw().del_point(_node_pos[0], _node_pos[1])
+                self.m_nodes_nb -= 1
+                self.update_all(_node)
                 break
-        self.update_all()
 
     # init all edge
     # any nodes pair that can touch with each other, and both of them is on working, 
@@ -124,8 +177,7 @@ class Map:
     def del_edge(self, _node1, _node2):
         idx = 0
         while idx < len(self.m_edges):
-            if self.m_edges[idx] in [(_node1, _node2), (_node2, _node1)]:
-                del self.m_edges[idx]
+            if self.m_edges[idx] in [[_node1, _node2], [_node2, _node1]]:
                 return 1
             else:
                 idx += 1
@@ -201,7 +253,12 @@ class Map:
 
             # switch status of nodes on working
             self.m_draw.mod_point(node_pos[0], node_pos[1])
+        
+        self.re_draw_route(nodes_in_route)
 
+    #re-draw
+    def re_draw_route(self, nodes_in_route):
+        # re-draw all edge on route path
         idx=0
         while idx < len(nodes_in_route) - 1:
             self.m_draw.add_edge(nodes_in_route[idx].get_pos(), nodes_in_route[idx+1].get_pos() , _col='green')
@@ -244,8 +301,8 @@ class Map:
     # stop all nodes 
     def stop_all_nodes(self):
         for _node in self.m_nodes_list:
-            if _node.is_work() and _node.is_run():
-                _node.stop_node()
+            # if _node.is_work() and _node.is_run():
+            _node.stop_node()
         
         for _node in self.m_nodes_list:
             _node.wait_node()

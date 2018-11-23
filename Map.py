@@ -51,6 +51,10 @@ class Map:
     def init_all_con(self):
         for con in self.m_con_pool:
             con.close_con()
+
+    # get draw obj
+    def get_draw(self):
+        return self.m_draw
     
     # get size of current map
     def get_size(self):

@@ -42,7 +42,7 @@ class Node:
 
         self.m_is_work=True
         self.m_is_run=True
-        self.m_id = int(re.search(r'(\d)', _name, re.I).group(0))
+        self.m_id = int(re.search(r'([\d]+)', _name, re.I).group(0))
         self.m_point_sz=5
         print("name=%s, id=%d, x=%d, y=%d, r=%d"%(self.m_name, self.m_id, self.m_x, self.m_y, self.m_range))
         self.m_type=0
@@ -228,7 +228,9 @@ class Node:
             msg_idx += 1
 
             # do snd
+            _map.get_draw().mod_point(self.m_x, self.m_y, _col='yellow')
             _snd_pipe.send(_msg_to_snd)
+            _map.get_draw().mod_point(self.m_x, self.m_y)
             print("sender %s: Send %d:\"%s\" to %s"%(self.get_name(), _msg_to_snd.get_id(), _msg_to_snd.get_content(), _next_hop_node.get_name() ) )
 
     # forwarder loop
@@ -283,7 +285,9 @@ class Node:
                         _snd_pipe = _tar_connect.get_snd_pipe(self.get_id())
 
                         #do send
+                        _map.get_draw().mod_point(self.m_x, self.m_y, _col='yellow')
                         _snd_pipe.send(_msg_to_snd)
+                        _map.get_draw().mod_point(self.m_x, self.m_y)
 
     # receiver loop
     def rcv_loop(self, _map):
@@ -298,9 +302,12 @@ class Node:
                     # put all msg got onto m_snd_buf
                     _got_msg = _rcv_pipe.recv()
                     while not _got_msg is None:
+                        _map.get_draw().mod_point(self.m_x, self.m_y, _col='yellow')
                         print("dst %s: recv %d:\"%s\" from %s"%(self.get_name(), _got_msg.get_id(), _got_msg.get_content(), _pre_node.get_name()) )
+                        _map.get_draw().mod_point(self.m_x, self.m_y)
                         self.m_snd_buf.put(_got_msg)
                         _got_msg = _rcv_pipe.recv()
+                        _map.get_draw().mod_point(self.m_x, self.m_y)
                 
     # wait work done
     def wait_node(self):

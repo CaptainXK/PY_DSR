@@ -6,6 +6,7 @@ from tkinter import *
 class Draw_map:
     m_tk=None
     m_canvas=None
+    m_btn_stop=None
     m_bg='white'
     m_point_size=0
 
@@ -13,9 +14,11 @@ class Draw_map:
         self.m_tk = Tk()
         self.m_tk.title('DSR simulation')
         self.m_canvas = Canvas(self.m_tk, width = _w, height = _h, bg=_bg)
+        self.m_btn_stop = Button(self.m_tk, text='Stop')
         self.m_bg = _bg
         self.m_point_size = 5
         self.m_canvas.pack()
+        self.m_btn_stop.pack()
 
     #circle : center point (_x, _y) ,R=_r
     def put_point(self, _x, _y, _col = 'black'):
@@ -49,7 +52,16 @@ class Draw_map:
     #remove all
     def remove_all(self):
         self.m_canvas.delete("all")
+    
+    #rebuild all
+    def rebuild_all(self):
+        self.m_canvas.pack()
+        self.m_btn_stop.pack()
 
     #bind double-click event
     def bind_dbc(self, call_back):
         self.m_canvas.bind("<Double-Button-1>", call_back)
+
+    #bind btn_stop press event
+    def bind_btn_stop(self, call_back):
+        self.m_btn_stop.bind("<Button-1>", call_back)

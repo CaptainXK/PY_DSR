@@ -1,7 +1,8 @@
-from Node import *
-from Draw_pic import *
-from Pipe import *
-from Route import *
+from Node import Node, gl_node_type
+from Draw_pic import Draw_map
+from Pipe import Pipe
+from Route import Connect, Msg, Route_path
+from queue import Queue
 
 class Map:
     m_w = 0
@@ -13,6 +14,8 @@ class Map:
     m_nodes_nb = 0
     m_nodes_list = []
     m_con_pool = []
+    m_cur_src=None
+    m_cur_dst=None
 
     #constructor
     def __init__(self, _w, _h):
@@ -25,11 +28,17 @@ class Map:
         self.m_nodes_nb = 0
         self.m_nodes_list = []
         self.m_con_pool = [Connect() for i in range(100)]
-        self.m_draw
+
         #bind double click function
         self.m_draw.bind_dbc(self.del_node)
 
+        self.m_cur_src=None
+        self.m_cur_dst=None
 
+        #bind stop
+        self.m_draw.bind_btn_stop(self.stop_all_nodes_callback)
+
+    # update before network rebuild anytime
     def update_all(self):
         self.m_draw.remove_all()
         self.put_nodes(self.m_nodes_list)
@@ -38,17 +47,21 @@ class Map:
         dst_id = len(self.m_nodes_list) - 1
         self.cal_route(self.m_nodes_list[src_id], self.m_nodes_list[dst_id])   
 
+    # reset all connect in connect pool
     def init_all_con(self):
         for con in self.m_con_pool:
             con.close_con()
     
+    # get size of current map
     def get_size(self):
         return [self.m_w, self.m_h]
     
+    # put a node onto map by its pos
     def put_node(self, _node):
         _pos = _node.get_pos()
         self.m_draw.put_point(_pos[0], _pos[1])
     
+    # put nodes from given nodes' list
     def put_nodes(self, _node_list):
         self.m_nodes_list = _node_list
 
@@ -59,19 +72,22 @@ class Map:
                 self.put_node(_node)
                 self.m_nodes_nb += 1
 
-    #double click event
+    # double click event
     def del_node(self, event):
         _x = event.x
         _y = event.y
         print("Double click event on (%d, %d)"%(_x, _y))
-        idx = 0
         for _node in self.m_nodes_list:
             if _node.under_cover(_x, _y):
                 print("Remove %s"%(_node.get_name()))
                 _node.go_die()
+                _node.stop_node()
                 break
         self.update_all()
 
+    # init all edge
+    # any nodes pair that can touch with each other, and both of them is on working, 
+    # contitudes a edge
     def init_edge(self):
         
         _node_list = self.m_nodes_list
@@ -93,12 +109,14 @@ class Map:
                             self.m_edges.append((node1, node2))
                             for con in self.m_con_pool:
                                 if not con.is_in_use():
+                                    # add a new connect for each nodes pair
                                     con.set_nodes(node1.get_id(), node2.get_id())
                                     node1.add_connect(con, node2)
                                     node2.add_connect(con, node1)
                                     con.open_con()
                                     break
 
+    #delete a edge
     def del_edge(self, _node1, _node2):
         idx = 0
         while idx < len(self.m_edges):
@@ -112,9 +130,9 @@ class Map:
         
         return 0
 
+    # calculate the shortest route path for given src and dst
+    # BFS to do that
     def cal_route(self, _src_node, _dst_node):
-        route_tmp = Route_path()
-
         #BFS to find the shortest path
         nodes_queue = Queue()
 
@@ -168,16 +186,67 @@ class Map:
 
         _route.show_route()
 
-        idx=0
+        _src_node.set_route(_route, _dst_node)
+
+        # update current global src_node and dst_node
+        self.m_cur_src = _src_node
+        self.m_cur_dst = _dst_node
 
         for _node in nodes_in_route:
             node_pos = _node.get_pos()
+
+            # switch status of nodes on working
             self.m_draw.mod_point(node_pos[0], node_pos[1])
 
+        idx=0
         while idx < len(nodes_in_route) - 1:
             self.m_draw.add_edge(nodes_in_route[idx].get_pos(), nodes_in_route[idx+1].get_pos() , _col='green')
             idx += 1
+    
+    # get src
+    def get_global_src(self):
+        return self.m_cur_src
+
+    # get node
+    def get_global_dst(self):
+        return self.m_cur_dst
+
+    # all nodes start
+    def start_all_nodes(self):
+        for _node in self.m_nodes_list:
+            if _node.is_work():
+                # for src node
+                if _node is self.get_global_src():
+                    _node.node_lunch('SRC', self)
+
+                #for dst node
+                elif _node is self.get_global_dst():
+                    _node.node_lunch('DST', self)
+
+                #for fwd node
+                else:
+                    _node.node_lunch('FWD', self)
+
+    # stop all node
+    # bind to button
+    def stop_all_nodes_callback(self, event):
+        for _node in self.m_nodes_list:
+            if _node.is_work() and _node.is_run():
+                _node.stop_node()
         
+        for _node in self.m_nodes_list:
+            _node.wait_node()
+
+    # stop all nodes 
+    def stop_all_nodes(self):
+        for _node in self.m_nodes_list:
+            if _node.is_work() and _node.is_run():
+                _node.stop_node()
+        
+        for _node in self.m_nodes_list:
+            _node.wait_node()
+    
+    #keep the map visiable
     def show_loop(self):
         self.m_draw.show_loop()
         

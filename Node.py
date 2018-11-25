@@ -2,6 +2,7 @@ import math
 from queue import Queue
 from Pipe import Pipe
 from Route import Connect, Msg, Route_path
+from Draw_pic import Draw_control_event
 import re
 import threading
 import datetime
@@ -23,7 +24,7 @@ class Node:
     m_type=0
     m_route=None #fwd route for src node
     m_node_thd=None
-
+    m_pip_to_draw=None
 
     def __init__(self, _name, _x, _y, _range):
         self.m_x = _x
@@ -32,7 +33,6 @@ class Node:
         self.m_name = _name
         self.m_snd_buf = Queue() 
         self.m_rsnd_buf = Queue() 
-        # self.m_rcv_buf = Queue()
 
         #next hop dist
         # key = next hop node
@@ -54,6 +54,9 @@ class Node:
         # init threading object for working loop 
         self.m_node_thd=None
 
+        #pipe to draw map obj
+        self.m_pip_to_draw=None
+
     #get node's id    
     def get_id(self):
         return self.m_id
@@ -69,7 +72,7 @@ class Node:
     #get communication range
     def get_range(self):
         return self.m_range
-    
+
     #check if current node can communicate with the given node 
     def can_touch(self, _node):
         _pos = _node.get_pos()
@@ -83,6 +86,7 @@ class Node:
             return True
         else:
             return False
+
     #sendmsg
     def send_msg(self, _tar_node, _msg):
         #send msg from snd_buf
@@ -163,6 +167,7 @@ class Node:
     def node_lunch(self, _type, _map):
         global gl_node_type
         self.m_type = gl_node_type[_type]
+        self.m_pip_to_draw = _map.get_draw_pipe()
 
         # init threading
         if self.m_type == gl_node_type['SRC']:
@@ -185,9 +190,24 @@ class Node:
         self.m_node_thd.start()
     
     # modify node's status color
-    def mod_node_status_col(self, _map, _col='red'):
+    def mod_node_status_col(self):
         if self.is_run() and self.is_work():
-            _map.get_draw().mod_point(self.m_x, self.m_y, _col)
+            _x = self.m_x
+            _y = self.m_y
+
+            #prepar msgs to make node blink
+            _control_msgs = []
+            _msg_on = Draw_control_event(src='Node', type='oval')
+            _msg_on.event_work_node(_x, _y)
+            _msg_off = Draw_control_event(src='Node', type='oval')
+            _msg_off.event_ready_node(_x, _y)
+
+            #append them into msgs list
+            _control_msgs.append(_msg_on)
+            _control_msgs.append(_msg_off)
+
+            #send them
+            self.m_pip_to_draw.send_all(_control_msgs)
             
 
     # sender loop
@@ -244,9 +264,8 @@ class Node:
             msg_idx += 1
 
             # do snd
-            self.mod_node_status_col(_map, _col='yellow')
             _snd_pipe.send(_msg_to_snd)
-            self.mod_node_status_col(_map)
+            self.mod_node_status_col()
             print("sender %s: Send %d:\"%s\" to %s"%(self.get_name(), _msg_to_snd.get_id(), _msg_to_snd.get_content(), _next_hop_node.get_name() ) )
 
     # forwarder loop
@@ -304,9 +323,8 @@ class Node:
                         _snd_pipe = _tar_connect.get_snd_pipe(self.get_id())
 
                         #do send
-                        self.mod_node_status_col(_map, _col='yellow')
                         _snd_pipe.send(_msg_to_snd)
-                        self.mod_node_status_col(_map)
+                        self.mod_node_status_col()
 
     # receiver loop
     def rcv_loop(self, _map):
@@ -327,12 +345,10 @@ class Node:
                     _got_msg = _rcv_pipe.recv()
 
                     while not _got_msg is None:
-                        self.mod_node_status_col(_map, _col='yellow')
                         print("dst %s: recv %d:\"%s\" from %s"%(self.get_name(), _got_msg.get_id(), _got_msg.get_content(), _pre_node.get_name()) )
-                        self.mod_node_status_col(_map)
                         self.m_snd_buf.put(_got_msg)
                         _got_msg = _rcv_pipe.recv()
-                        self.mod_node_status_col(_map)
+                        self.mod_node_status_col()
                 
     # wait work done
     def wait_node(self):

@@ -1,5 +1,5 @@
 from Node import Node, gl_node_type
-from Draw_pic import Draw_map
+from Draw_pic import Draw_map, Draw_control_event
 from Pipe import Pipe
 from Route import Connect, Msg, Route_path
 from queue import Queue
@@ -17,35 +17,47 @@ class Map:
     m_cur_src=None
     m_cur_dst=None
     m_is_in_rebuild=False
+    m_pipe_to_draw=None
 
     #constructor
     def __init__(self, _w, _h):
         self.m_w = _w
         self.m_h = _h
         self.m_map = [[ 0 for i in range(_w + 1)] for i in range(_h + 1)]
-        self.m_draw = Draw_map(self.m_w, self.m_h)
         self.m_edges = []
-        self.m_pipes = []
         self.m_nodes_nb = 0
         self.m_nodes_list = []
         self.m_con_pool = [Connect() for i in range(100)]
         self.m_is_in_rebuild=False
 
-        #bind double click function
-        self.m_draw.bind_dbc(self.del_node)
 
+        # init src and dst node
         self.m_cur_src=None
         self.m_cur_dst=None
 
-        #bind stop
+        #pipe to draw obj, put it into draw obj, lunch draw module work
+        self.m_draw = Draw_map(self.m_w, self.m_h)
+        self.m_pipe_to_draw = Pipe()
+        self.m_draw.set_event_pipe(self.m_pipe_to_draw)
         self.m_draw.bind_btn_stop(self.stop_all_nodes_callback)
+        self.m_draw.bind_dbc(self.del_node)
+        self.m_draw.build_all()
+        self.m_draw.lunch_work()
+
+    
+    #destructor
+    def __del__(self):
+        self.stop_all_nodes()
+        del self.m_draw
 
     # build map
     def do_build(self):
+        self.m_draw.lock()
         self.m_is_in_rebuild = True
     
     # build map
     def done_build(self):
+        self.m_draw.unlock()
         self.m_is_in_rebuild = False
     
     def is_in_rebuild(self):
@@ -55,31 +67,26 @@ class Map:
     def update_all(self, _del_node):
         # rebuild
         self.do_build()
-
+        
         self.m_draw.remove_all()
-        self.init_edge()
+
+        # re-put all nodes
+        self.put_nodes()
 
         # get current route info of src node
         _cur_src_route_dict = self.get_global_src().get_route()
         _cur_src_route = _cur_src_route_dict[self.get_global_dst()]
 
-        # check if deleted node is in the route path
+        # check if deleted node is in the route path in using
         if _cur_src_route.is_in(_del_node):
             #re-build and re-draw route
-            nodes_in_path = _cur_src_route.get_nodes_in_path()
-            idx = 0
-            while idx < ( len(nodes_in_path) - 1):
-                self.del_edge(nodes_in_path[idx], nodes_in_path[idx+1])
-                idx += 1
-
-            # no route path available, stop src node sending msg
+            # if no route path available, stop src node sending msg
             if not self.cal_route(self.get_global_src(), self.get_global_dst()):
                 self.get_global_src().stop_node()
         else:
             # just re-draw route
             self.re_draw_route(_cur_src_route.get_nodes_in_path())
         
-        self.put_nodes()
 
         # rebuild done
         self.done_build()
@@ -93,6 +100,10 @@ class Map:
     def get_draw(self):
         return self.m_draw
     
+    # get draw pipe
+    def get_draw_pipe(self):
+        return self.m_pipe_to_draw
+    
     # get size of current map
     def get_size(self):
         return [self.m_w, self.m_h]
@@ -102,22 +113,26 @@ class Map:
         self.m_nodes_list = _nodes_list
         self.m_nodes_nb = len(_nodes_list)
     
-    # put a node onto map by its pos
-    def put_node(self, _node):
-        _pos = _node.get_pos()
-        self.m_draw.put_point(_pos[0], _pos[1])
-    
     # put nodes from given nodes' list
     def put_nodes(self):
         # draw nodes one by one 
         # ignore node un-work
+        print("[Put nodes]")
         for _node in self.m_nodes_list:
             if _node.is_work():
                 self.put_node(_node)
                 if _node is self.get_global_src() or _node is self.get_global_dst():
                     #mark src and dst node
                     self.mark_node(_node)
+    
+    # put a node onto map by its pos
+    def put_node(self, _node):
+        _pos = _node.get_pos()
 
+        #send create node msg to draw obj
+        _control_msg = Draw_control_event(src='Map', type = 'oval')
+        _control_msg.event_create_node(_pos[0], _pos[1])
+        self.m_pipe_to_draw.send(_control_msg)
 
 
     # double click event
@@ -125,9 +140,10 @@ class Map:
         _x = event.x
         _y = event.y
         print("Double click event on (%d, %d)"%(_x, _y))
+
         for _node in self.m_nodes_list:
             if _node.under_cover(_x, _y):
-
+                # deleting src or dst node is forbidden
                 if _node is self.get_global_src():
                     print("Can not delete src node")
                     return
@@ -136,11 +152,19 @@ class Map:
                     return
                 else:
                     print("Remove %s"%(_node.get_name()))
-                
+
+                # node just go die                
                 _node.go_die()
-                _node.stop_node()
-                _node_pos = _node.get_pos()
-                self.get_draw().del_point(_node_pos[0], _node_pos[1])
+
+                #prepar to delete node
+                _pos = _node.get_pos()
+
+                #send del node msg to draw obj
+                _control_msg = Draw_control_event(src='Map', type='oval')
+                _control_msg.event_delete_node(_pos[0], _pos[1])
+                self.m_pipe_to_draw.send(_control_msg)
+
+                #update nodes nb
                 self.m_nodes_nb -= 1
                 self.update_all(_node)
                 break
@@ -148,7 +172,11 @@ class Map:
     # mark a node
     def mark_node(self, _node):
         _pos = _node.get_pos()
-        self.m_draw.mark_point(_pos[0], _pos[1])
+        
+        # send mark node msg to draw obj
+        _control_msg = Draw_control_event(src='Map', type='oval')
+        _control_msg.event_mark_node(_pos[0], _pos[1])
+        self.m_pipe_to_draw.send(_control_msg)
 
     # init all edge
     # any nodes pair that can touch with each other, and both of them is on working, 
@@ -180,19 +208,6 @@ class Map:
                                     node2.add_connect(con, node1)
                                     con.open_con()
                                     break
-
-    #delete a edge
-    def del_edge(self, _node1, _node2):
-        idx = 0
-        while idx < len(self.m_edges):
-            if self.m_edges[idx] in [[_node1, _node2], [_node2, _node1]]:
-                return 1
-            else:
-                idx += 1
-
-        self.m_draw.del_edge(_node1.get_pos(), _node2.get_pos())
-        
-        return 0
 
     # calculate the shortest route path for given src and dst
     # BFS to do that
@@ -256,23 +271,45 @@ class Map:
         self.m_cur_src = _src_node
         self.m_cur_dst = _dst_node
 
+
+        # switch node status color on route
+        _control_msgs=[]
         for _node in nodes_in_route:
-            node_pos = _node.get_pos()
+            _pos = _node.get_pos()
 
-            # switch status of nodes on working
-            self.m_draw.mod_point(node_pos[0], node_pos[1])
+            #prepar node status switch msg
+            _control_msg = Draw_control_event(src='Map', type='oval')
+            _control_msg.event_ready_node(_pos[0], _pos[1])
+            _control_msgs.append(_control_msg)
+
+        # send msg of switching nodes' status to draw module
+        self.m_pipe_to_draw.send_all(_control_msgs)
         
+        # draw route edge
         self.re_draw_route(nodes_in_route)
-
+        
         return True
 
     #re-draw route path
     def re_draw_route(self, nodes_in_route):
         # re-draw all edge on route path
         idx=0
+        _control_msgs=[]
         while idx < len(nodes_in_route) - 1:
-            self.m_draw.add_edge(nodes_in_route[idx].get_pos(), nodes_in_route[idx+1].get_pos() , _col='green')
+            # get pos of two node
+            _pos1 = nodes_in_route[idx].get_pos()
+            _pos2 = nodes_in_route[idx+1].get_pos()
+
+            # prepar route create evnet
+            _control_msg = Draw_control_event(src='Map', type='edge')
+            _control_msg.event_create_route(_pos1[0], _pos1[1], _pos2[0], _pos2[1])
+
+            #add it to msgs list
+            _control_msgs.append(_control_msg)
             idx += 1
+        
+        # send burst of control msg at one time
+        self.m_pipe_to_draw.send_all(_control_msgs)
     
     # get src
     def get_global_src(self):
@@ -316,6 +353,8 @@ class Map:
         
         for _node in self.m_nodes_list:
             _node.wait_node()
+        
+        self.m_draw.quit()
     
     #keep the map visiable
     def show_loop(self):

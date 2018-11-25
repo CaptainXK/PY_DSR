@@ -49,8 +49,15 @@ class Pipe:
         
             self.m_msg_nb = 0
         
-
         return _msgs
+
+    #drop all
+    def drop_all(self):
+        with self.rw_lock:
+            while not self.m_buf.empty():
+                self.m_buf.get()
+
+
 
 
 

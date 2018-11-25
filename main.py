@@ -70,18 +70,20 @@ def __main__():
     _map.load_nodes(nodes_list)
 
     _map.init_edge()
+    
+    _map.put_nodes()
 
     src_id = 0
     dst_id = len(nodes_list) - 1
 
     _map.cal_route(nodes_list[src_id], nodes_list[dst_id])
     
-    _map.put_nodes()
-
     _map.start_all_nodes()
 
     _map.show_loop()
 
     _map.stop_all_nodes()
+
+    del _map
 
 __main__()

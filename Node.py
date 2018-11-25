@@ -290,14 +290,12 @@ class Node:
                     if _msg_to_snd == None:
                         break
                     
-                    # print("Msg \"%s\" in buf is ready to send"%( _msg_to_snd.get_content() ) )
                     
                     # find next hop by route info on msg
                     _next_hop_node = _msg_to_snd.get_route().find_next_hop(self)
                     # print("Next hop node is %s"%(_next_hop_node.get_name() ) )
 
                     if (not _next_hop_node is None) and _next_hop_node.is_work():
-                        # print("%s: Send %d:\"%s\" to %s"%(self.get_name(), _msg_to_snd.get_id(), _msg_to_snd.get_content(), _next_hop_node.get_name() ) )
 
                         #find connect to target connect
                         _tar_connect = self.m_connects[_next_hop_node]
@@ -331,6 +329,7 @@ class Node:
                     while not _got_msg is None:
                         self.mod_node_status_col(_map, _col='yellow')
                         print("dst %s: recv %d:\"%s\" from %s"%(self.get_name(), _got_msg.get_id(), _got_msg.get_content(), _pre_node.get_name()) )
+                        self.mod_node_status_col(_map)
                         self.m_snd_buf.put(_got_msg)
                         _got_msg = _rcv_pipe.recv()
                         self.mod_node_status_col(_map)

@@ -17,7 +17,6 @@ class Node:
     m_name=''
     m_snd_buf=None
     m_rsnd_buf=None
-    # m_rcv_buf=None
     m_connects=None
     m_id=0
     m_point_sz=5
@@ -184,6 +183,12 @@ class Node:
         #start to work    
         self.start_node()
         self.m_node_thd.start()
+    
+    # modify node's status color
+    def mod_node_status_col(self, _map, _col='red'):
+        if self.is_run() and self.is_work():
+            _map.get_draw().mod_point(self.m_x, self.m_y, _col)
+            
 
     # sender loop
     def snd_loop(self, _map):
@@ -239,9 +244,9 @@ class Node:
             msg_idx += 1
 
             # do snd
-            _map.get_draw().mod_point(self.m_x, self.m_y, _col='yellow')
+            self.mod_node_status_col(_map, _col='yellow')
             _snd_pipe.send(_msg_to_snd)
-            _map.get_draw().mod_point(self.m_x, self.m_y)
+            self.mod_node_status_col(_map)
             print("sender %s: Send %d:\"%s\" to %s"%(self.get_name(), _msg_to_snd.get_id(), _msg_to_snd.get_content(), _next_hop_node.get_name() ) )
 
     # forwarder loop
@@ -301,9 +306,9 @@ class Node:
                         _snd_pipe = _tar_connect.get_snd_pipe(self.get_id())
 
                         #do send
-                        _map.get_draw().mod_point(self.m_x, self.m_y, _col='yellow')
+                        self.mod_node_status_col(_map, _col='yellow')
                         _snd_pipe.send(_msg_to_snd)
-                        _map.get_draw().mod_point(self.m_x, self.m_y)
+                        self.mod_node_status_col(_map)
 
     # receiver loop
     def rcv_loop(self, _map):
@@ -319,16 +324,16 @@ class Node:
                     # try receive on each connect
                     _rcv_pipe = _connect.get_rcv_pipe(self.get_id())
 
-                    # read all msg on rcv pipe
-                    # put all msg got onto m_snd_buf
+                    # read all msg on rcv pipe, put all msg got onto m_snd_buf
+                    # do recv all
                     _got_msg = _rcv_pipe.recv()
+
                     while not _got_msg is None:
-                        _map.get_draw().mod_point(self.m_x, self.m_y, _col='yellow')
+                        self.mod_node_status_col(_map, _col='yellow')
                         print("dst %s: recv %d:\"%s\" from %s"%(self.get_name(), _got_msg.get_id(), _got_msg.get_content(), _pre_node.get_name()) )
-                        _map.get_draw().mod_point(self.m_x, self.m_y)
                         self.m_snd_buf.put(_got_msg)
                         _got_msg = _rcv_pipe.recv()
-                        _map.get_draw().mod_point(self.m_x, self.m_y)
+                        self.mod_node_status_col(_map)
                 
     # wait work done
     def wait_node(self):

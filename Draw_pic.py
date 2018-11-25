@@ -1,6 +1,5 @@
 # import Tkinter
 # from Tkinter import *
-import tkinter
 from tkinter import *
 
 class Draw_map:

@@ -59,11 +59,6 @@ class Map:
         self.m_draw.remove_all()
         self.init_edge()
 
-        # # delete all edge consisting of un-work node
-        # for [_node1, _node2] in self.m_edges:
-        #     if _del_node in [_node1, _node2]:
-        #         self.del_edge(_node1, _node2)
-        
         # get current route info of src node
         _cur_src_route_dict = self.get_global_src().get_route()
         _cur_src_route = _cur_src_route_dict[self.get_global_dst()]
@@ -77,7 +72,9 @@ class Map:
                 self.del_edge(nodes_in_path[idx], nodes_in_path[idx+1])
                 idx += 1
 
-            self.cal_route(self.get_global_src(), self.get_global_dst()) 
+            # no route path available, stop src node sending msg
+            if not self.cal_route(self.get_global_src(), self.get_global_dst()):
+                self.get_global_src().stop_node()
         else:
             # just re-draw route
             self.re_draw_route(_cur_src_route.get_nodes_in_path())
@@ -117,6 +114,11 @@ class Map:
         for _node in self.m_nodes_list:
             if _node.is_work():
                 self.put_node(_node)
+                if _node is self.get_global_src() or _node is self.get_global_dst():
+                    #mark src and dst node
+                    self.mark_node(_node)
+
+
 
     # double click event
     def del_node(self, event):
@@ -143,6 +145,11 @@ class Map:
                 self.update_all(_node)
                 break
 
+    # mark a node
+    def mark_node(self, _node):
+        _pos = _node.get_pos()
+        self.m_draw.mark_point(_pos[0], _pos[1])
+
     # init all edge
     # any nodes pair that can touch with each other, and both of them is on working, 
     # contitudes a edge
@@ -163,7 +170,7 @@ class Map:
                     if node1.can_touch(node2):
                         # avoid duplicate edge, like "a->b" and "b->a"
                         if not ((node1, node2) in self.m_edges or (node2, node1) in self.m_edges):
-                            self.m_draw.add_edge(node1.get_pos(), node2.get_pos(), _dash=(4,4) )
+                            # self.m_draw.add_edge(node1.get_pos(), node2.get_pos(), _dash=(4,4) )
                             self.m_edges.append((node1, node2))
                             for con in self.m_con_pool:
                                 if not con.is_in_use():
@@ -225,7 +232,7 @@ class Map:
 
         if not (cur_node is _dst_node):
             print("No available route Path!")
-            return  
+            return False
 
         # trace back the whole route
         nodes_in_route = []
@@ -256,6 +263,8 @@ class Map:
             self.m_draw.mod_point(node_pos[0], node_pos[1])
         
         self.re_draw_route(nodes_in_route)
+
+        return True
 
     #re-draw route path
     def re_draw_route(self, nodes_in_route):

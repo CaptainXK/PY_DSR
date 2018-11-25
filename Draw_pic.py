@@ -20,11 +20,24 @@ class Draw_map:
         self.m_btn_stop.pack()
 
     #circle : center point (_x, _y) ,R=_r
-    def put_point(self, _x, _y, _col = 'black'):
-        _r = self.m_point_size
+    def put_point(self, _x, _y, _col = 'black', _dash=None):
+        _width = 1
+        _outl = None
 
-        self.m_canvas.create_oval(_x-_r, _y-_r, _x+_r, _y+_r, fill=_col)
+        if _dash is None:
+            _r = self.m_point_size
+        else:
+            _r = (self.m_point_size) * 3
+            _width = 2
+            _outl = 'red' 
+            _col = None
+
+        self.m_canvas.create_oval(_x-_r, _y-_r, _x+_r, _y+_r, fill=_col, outline = _outl, width = _width, dash = _dash)
         self.m_tk.update()
+
+    # mark a point
+    def mark_point(self, _x, _y, _width = 2):
+        self.put_point(_x, _y, _dash=(4,4))
 
     #change point stat
     def mod_point(self, _x, _y, _col = 'red'):

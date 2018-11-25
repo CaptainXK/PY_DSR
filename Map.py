@@ -40,11 +40,12 @@ class Map:
         #bind stop
         self.m_draw.bind_btn_stop(self.stop_all_nodes_callback)
 
-    # rebuild map
-    def do_rebuild(self):
+    # build map
+    def do_build(self):
         self.m_is_in_rebuild = True
     
-    def done_rebuild(self):
+    # build map
+    def done_build(self):
         self.m_is_in_rebuild = False
     
     def is_in_rebuild(self):
@@ -53,7 +54,7 @@ class Map:
     # update before network rebuild anytime
     def update_all(self, _del_node):
         # rebuild
-        self.do_rebuild()
+        self.do_build()
 
         self.m_draw.remove_all()
         self.init_edge()
@@ -84,7 +85,7 @@ class Map:
         self.put_nodes()
 
         # rebuild done
-        self.done_rebuild()
+        self.done_build()
 
     # reset all connect in connect pool
     def init_all_con(self):
@@ -256,7 +257,7 @@ class Map:
         
         self.re_draw_route(nodes_in_route)
 
-    #re-draw
+    #re-draw route path
     def re_draw_route(self, nodes_in_route):
         # re-draw all edge on route path
         idx=0

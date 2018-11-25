@@ -306,16 +306,22 @@ class Map:
                 _node.stop_node()
         
         for _node in self.m_nodes_list:
-            _node.wait_node()
+            if _node.is_work() and _node.is_run():
+                _node.wait_node()
+
+        print("All node stop")
 
     # stop all nodes 
     def stop_all_nodes(self):
         for _node in self.m_nodes_list:
-            # if _node.is_work() and _node.is_run():
-            _node.stop_node()
+            if _node.is_work() and _node.is_run():
+                _node.stop_node()
         
         for _node in self.m_nodes_list:
-            _node.wait_node()
+            if _node.is_work() and _node.is_run():
+                _node.wait_node()
+        
+        print("All node stop")
     
     #keep the map visiable
     def show_loop(self):

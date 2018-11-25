@@ -11,14 +11,6 @@ class Pipe:
         self.m_buf = Queue()
         self.m_msg_nb=0
 
-    # # try lock 
-    # def do_lock(self):
-    #     self.rw_lock.acquire()
-    
-    # # try release
-    # def do_release(self):
-    #     self.rw_lock.release()
-
     # put msg onto buf 
     def send(self, _msg):
         with self.rw_lock:
@@ -46,6 +38,7 @@ class Pipe:
 
         return _msg
 
+    # recv all msg from m_buf
     def recv_all(self):
         _msgs = []
         

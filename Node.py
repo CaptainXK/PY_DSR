@@ -5,6 +5,7 @@ from Route import Connect, Msg, Route_path
 import re
 import threading
 import datetime
+import time
 
 gl_node_type={'SRC':0, 'FWD':1, 'DST':2}
 
@@ -146,7 +147,7 @@ class Node:
     #stop running
     def stop_node(self):
         if self.is_run():
-            print("%s stop running"%(self.get_name()))
+            # print("%s stop running"%(self.get_name()))
             self.m_is_run = False
 
     #check if the given pos(_x, _y) is on node
@@ -186,8 +187,9 @@ class Node:
     
     # modify node's status color
     def mod_node_status_col(self, _map, _col='red'):
-        if self.is_run() and self.is_work():
-            _map.get_draw().mod_point(self.m_x, self.m_y, _col)
+        # pass
+        _map.get_draw().mod_point(self.m_x, self.m_y, _col)
+        # time.sleep(1)
             
 
     # sender loop
@@ -226,6 +228,8 @@ class Node:
 
             # find next hop on current route
             _next_hop_node = _route_to_dst.find_next_hop(self)
+            if not _next_hop_node.is_work():
+                continue
 
             # find connect to next hop node
             _next_hop_con = self.get_connect(_next_hop_node)
@@ -246,8 +250,9 @@ class Node:
             # do snd
             self.mod_node_status_col(_map, _col='yellow')
             _snd_pipe.send(_msg_to_snd)
-            self.mod_node_status_col(_map)
             print("sender %s: Send %d:\"%s\" to %s"%(self.get_name(), _msg_to_snd.get_id(), _msg_to_snd.get_content(), _next_hop_node.get_name() ) )
+            self.mod_node_status_col(_map)
+        print("[%s quit]"%(self.get_name()))
 
     # forwarder loop
     def fwd_loop(self, _map):
@@ -307,6 +312,8 @@ class Node:
                         self.mod_node_status_col(_map, _col='yellow')
                         _snd_pipe.send(_msg_to_snd)
                         self.mod_node_status_col(_map)
+        
+        print("[%s quit]"%(self.get_name()))
 
     # receiver loop
     def rcv_loop(self, _map):
@@ -332,10 +339,12 @@ class Node:
                         self.mod_node_status_col(_map)
                         self.m_snd_buf.put(_got_msg)
                         _got_msg = _rcv_pipe.recv()
-                        self.mod_node_status_col(_map)
+        print("[%s quit]"%(self.get_name()))
                 
     # wait work done
     def wait_node(self):
-        self.m_node_thd.join()
+        if self.is_work() and self.is_run():
+            self.m_node_thd.join()
+        print("[%s quit]"%(self.get_name()))
 
     

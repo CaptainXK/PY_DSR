@@ -70,11 +70,6 @@ class Draw_map:
     def remove_all(self):
         self.m_canvas.delete("all")
     
-    #rebuild all
-    def rebuild_all(self):
-        self.m_canvas.pack()
-        self.m_btn_stop.pack()
-
     #bind double-click event
     def bind_dbc(self, call_back):
         self.m_canvas.bind("<Double-Button-1>", call_back)

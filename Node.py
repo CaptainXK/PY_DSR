@@ -147,7 +147,6 @@ class Node:
     #stop running
     def stop_node(self):
         if self.is_run():
-            # print("%s stop running"%(self.get_name()))
             self.m_is_run = False
 
     #check if the given pos(_x, _y) is on node

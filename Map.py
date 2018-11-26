@@ -20,6 +20,7 @@ class Map:
     m_cur_dst=None
     m_is_in_rebuild=False
     m_draw_lock=None
+    m_is_quit=False
 
     #constructor
     def __init__(self, _w, _h):
@@ -45,6 +46,8 @@ class Map:
         #init draw lock
         self.m_draw_lock = threading.Lock()
 
+        self.m_is_quit=False
+
     # show map 
     def show_all(self):
         self.m_draw.show_all()
@@ -60,6 +63,10 @@ class Map:
 
         # check if deleted node is in the route path
         if _cur_src_route.is_in(_del_node):
+            # stop all nodes in current route path
+            for _node in _cur_src_route.get_nodes_in_path():
+                _node.stop_node()
+
             #re-build and re-draw route
             nodes_in_path = _cur_src_route.get_nodes_in_path()
             idx = 0
@@ -70,11 +77,15 @@ class Map:
             # no route path available, stop src node sending msg
             if not self.cal_route(self.get_global_src(), self.get_global_dst()):
                 self.get_global_src().stop_node()
+
+            # restart all paused node
+            for _node in _cur_src_route.get_nodes_in_path():
+                _node.start_node()
         else:
             # just re-draw route
             self.re_draw_route(_cur_src_route.get_nodes_in_path())
         
-        self.put_nodes()
+        # self.put_nodes()
 
     # reset all connect in connect pool
     def init_all_con(self):
@@ -233,18 +244,13 @@ class Map:
         self.m_cur_src = _src_node
         self.m_cur_dst = _dst_node
 
-        # try lock
-        while not self.m_draw_lock.acquire(False):
-            continue
+        self.re_draw_route(nodes_in_route)
+        
         # process
         for _node in nodes_in_route:
             node_pos = _node.get_pos()
             # switch status of nodes on working
             self.m_draw.mod_point(node_pos[0], node_pos[1])
-        # release
-        self.m_draw_lock.release()
-        
-        self.re_draw_route(nodes_in_route)
 
         return True
 
@@ -287,8 +293,9 @@ class Map:
                     _node.node_lunch('FWD', self)
 
         # try to wait all thread configure
-        time.sleep(2)
+        time.sleep(5)
 
+        # start all nodes
         for _node in self.m_nodes_list:
             if _node.is_work():
                 _node.start_node()
@@ -325,7 +332,6 @@ class Map:
     # bind to button
     def stop_all_nodes_callback(self, event):
         for _node in self.m_nodes_list:
-            if _node.is_work() and _node.is_run():
                 _node.go_die()
         
         for _node in self.m_nodes_list:
@@ -333,10 +339,14 @@ class Map:
 
         print("All node stop")
 
+        self.m_is_quit = True
+
     # stop all nodes 
     def stop_all_nodes(self):
+        if self.m_is_quit:
+            return
+
         for _node in self.m_nodes_list:
-            if _node.is_work() and _node.is_run():
                 _node.go_die()
         
         for _node in self.m_nodes_list:

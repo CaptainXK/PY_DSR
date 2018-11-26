@@ -89,8 +89,6 @@ class Map:
         else:
             # just re-draw route
             self.re_draw_route(_cur_src_route.get_nodes_in_path())
-        
-        # self.put_nodes()
 
     # reset all connect in connect pool
     def init_all_con(self):
@@ -177,13 +175,8 @@ class Map:
             else:
                 idx += 1
 
-        # try lock
-        while not self.m_draw_lock.acquire(False):
-            continue
         # process
         self.m_draw.del_edge(_node1.get_pos(), _node2.get_pos())
-        # release
-        self.m_draw_lock.release()
         
         return 0
 
@@ -259,15 +252,11 @@ class Map:
     def re_draw_route(self, nodes_in_route):
         # re-draw all edge on route path
         idx=0
-        # try lock
-        while not self.m_draw_lock.acquire(False):
-            continue
+
         # process
         while idx < len(nodes_in_route) - 1:
             self.m_draw.add_edge(nodes_in_route[idx].get_pos(), nodes_in_route[idx+1].get_pos() , _fill='green')
             idx += 1
-        # release
-        self.m_draw_lock.release()
     
     # get src
     def get_global_src(self):
@@ -283,15 +272,15 @@ class Map:
             if _node.is_work():
                 # for src node
                 if _node is self.get_global_src():
-                    _node.node_lunch('SRC', self)
+                    _node.node_lunch()
 
                 #for dst node
                 elif _node is self.get_global_dst():
-                    _node.node_lunch('DST', self)
+                    _node.node_lunch()
 
                 #for fwd node
                 else:
-                    _node.node_lunch('FWD', self)
+                    _node.node_lunch()
 
         # try to wait all thread configure
         time.sleep(5)

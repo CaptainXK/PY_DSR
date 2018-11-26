@@ -31,11 +31,25 @@ def load_nodes(_file, _nodes_list):
     with open(_file, 'r') as _fin:
         _datas = _fin.readlines()
 
+    # first node is src node
+    # last node is dst node
+    src_id = 0
+    dst_id = len(_datas) - 1
+    idx = 0
     for _data_items in _datas:
         _data = _data_items.split(' ')
+        node_tmp = None
         # print("name=%s, x=%d, y=%d, range=%d"%(_data[0], int(_data[1]), int(_data[2]), int(_data[3])))
-        node_tmp = Node(_data[0], int(_data[1]), int(_data[2]), int(_data[3]))
+        if idx == src_id:
+            node_tmp = Snd_node(_data[0], int(_data[1]), int(_data[2]), int(_data[3]))
+        elif idx == dst_id:
+            node_tmp = rcv_node(_data[0], int(_data[1]), int(_data[2]), int(_data[3]))
+        else:
+            node_tmp = fwd_node(_data[0], int(_data[1]), int(_data[2]), int(_data[3]))
+
         _nodes_list.append(node_tmp)
+
+        idx += 1
 
 def fake_load_node(_nodes_list):
     init_pos = [[10, 10, 100], [50, 50, 100], [100,100,200], [150, 150,150], [150, 200, 150]]

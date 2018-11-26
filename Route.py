@@ -50,24 +50,24 @@ class Connect:
 
 class Route_path:
     m_nodes_nb=0
-    #nodes from source to destination
+    # nodes from source to destination
     m_nodes_list=[]
 
     def __init__(self):
         self.m_nodes_nb=0
         self.m_nodes_list=[]
 
-    #add one node to node list by order
+    # add one node to node list by order
     def add_node(self, _node):
         self.m_nodes_list.append(_node)
         self.m_nodes_nb += 1
     
-    #build by node list
+    # build by node list
     def init_by_nodes(self, _nodes_list):
         for _node in _nodes_list:
             self.add_node(_node)
     
-    #find the next node for given node on current route
+    # find the next node for given node on current route
     def find_next_hop(self, _node):
         _next_node=None
         idx = 0
@@ -80,7 +80,7 @@ class Route_path:
 
         return _next_node
 
-    #show nodes on current route
+    # show nodes on current route
     def show_route(self):
         for _node in self.m_nodes_list:
             print("%d"%(_node.get_id()), end=' ')
@@ -90,17 +90,22 @@ class Route_path:
     def get_nodes_in_path(self):
         return self.m_nodes_list
 
-    #is in route
+    # is in route
     def is_in(self, _node):
         if _node in self.m_nodes_list:
             return True
         else:
             return False
+    
+    #
 
 class Msg:
     m_content=''
     m_route_info=None
     m_id=0
+    m_type=0 # 0 for route discover msg, 
+             # 1 for route feedback msg,
+             # 2 for normal msg 
 
     def __init__(self):
         self.m_route_list = []
@@ -131,3 +136,10 @@ class Msg:
     # get id
     def get_id(self):
         return self.m_id
+
+    # append a node id
+    def append_node_id(self, _id):
+        _cur_content = self.get_content()
+        _cur_content.append(_id)
+
+    

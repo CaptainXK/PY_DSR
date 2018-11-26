@@ -9,6 +9,7 @@ import time
 
 gl_node_type={'SRC':0, 'FWD':1, 'DST':2}
 
+# Node base class
 class Node:
     m_is_work=True # node is available or not
     m_is_run=True # node threading is running or not
@@ -25,7 +26,6 @@ class Node:
     m_route=None #fwd route for src node
     m_node_thd=None
 
-
     def __init__(self, _name, _x, _y, _range):
         self.m_x = _x
         self.m_y = _y
@@ -33,7 +33,6 @@ class Node:
         self.m_name = _name
         self.m_snd_buf = Queue() 
         self.m_rsnd_buf = Queue() 
-        # self.m_rcv_buf = Queue()
 
         #next hop dist
         # key = next hop node
@@ -44,7 +43,6 @@ class Node:
         self.m_is_run=True
         self.m_id = int(re.search(r'([\d]+)', _name, re.I).group(0))
         self.m_point_sz=5
-        print("name=%s, id=%d, x=%d, y=%d, r=%d"%(self.m_name, self.m_id, self.m_x, self.m_y, self.m_range))
         self.m_type=0
 
         #route dist
@@ -84,6 +82,7 @@ class Node:
             return True
         else:
             return False
+    
     #sendmsg
     def send_msg(self, _tar_node, _msg):
         #send msg from snd_buf
@@ -159,50 +158,39 @@ class Node:
         else:
             return False
     
+    # wait work done
+    def wait_node(self):
+        self.m_node_thd.join()
+        # print("[%s quit]"%(self.get_name()))
+
+# sender node
+class Snd_node(Node):
+    def __init__(self, _name, _x, _y, _range):
+        # involve base class init
+        Node.__init__(self, _name, _x, _y, _range)
+    
     # lunch a node
-    def node_lunch(self, _type, _map):
-        global gl_node_type
-        self.m_type = gl_node_type[_type]
-
+    def node_lunch(self):
         # init threading
-        if self.m_type == gl_node_type['SRC']:
-            #send node
-            print("%s is sender"%(self.get_name()))
-            self.m_node_thd = threading.Thread(target=Node.snd_loop, args=(self, _map) )
-
-        elif self.m_type == gl_node_type['FWD']:
-            #forward node
-            print("%s is forwarder"%(self.get_name()))
-            self.m_node_thd = threading.Thread(target=Node.fwd_loop, args=(self, _map) )
-
-        else:
-            #receive node
-            print("%s is receiver"%(self.get_name()))
-            self.m_node_thd = threading.Thread(target=Node.rcv_loop, args=(self, _map) )
+        self.m_node_thd = threading.Thread(target=Snd_node.main_loop, args=(self) )
 
         #start to work    
-        # self.start_node()
         self.m_node_thd.start()
+
+    # process rd_msg
+    def process_rd_msg(self, _msg):
+        pass
+
+    # process fb_msg
+    def process_fb_msg(self, _msg):
+        pass
     
-    # modify node's status color
-    def mod_node_status_col(self, _map):
-        # process
-        if _map.get_draw().m_draw_lock.acquire(False):
-            if self.is_run() and self.is_work():
-                try:
-                    _map.get_draw().mod_point(self.m_x, self.m_y, _fill='yellow')
-                    _map.get_draw().mod_point(self.m_x, self.m_y)
-                except Exception as err:
-                    print("%s : node mode eror %s"%(self.get_name(), format(err)) )
-                finally:
-                    _map.get_draw().m_draw_lock.release()
-            else:
-                _map.get_draw().m_draw_lock.release()
-
-            
-
+    # process nor msg
+    def process_nor_msg(self, _msg):
+        pass
+    
     # sender loop
-    def snd_loop(self, _map):
+    def main_loop(self):
         # send one msg every 3 seconds
         pre_time = datetime.datetime.now()
         cur_time = 0
@@ -218,7 +206,7 @@ class Node:
             # update cur_time
             cur_time = datetime.datetime.now()
 
-            #check if it is time to send
+            # check if it is time to send
             if (cur_time - pre_time).seconds < 3:
                 # keep wait
                 continue
@@ -260,12 +248,38 @@ class Node:
             # do snd
             _snd_pipe.send(_msg_to_snd)
             print("sender %s: Send %d:\"%s\" to %s"%(self.get_name(), _msg_to_snd.get_id(), _msg_to_snd.get_content(), _next_hop_node.get_name() ) )
-            # self.mod_node_status_col(_map)
 
+        # quit main loop
         print("[%s quit]"%(self.get_name()))
 
+# forwarder node
+class Fwd_node(Node):
+    def __init__(self, _name, _x, _y, _range):
+        # involve base class init
+        Node.__init__(self, _name, _x, _y, _range)
+    
+    # lunch a node
+    def node_lunch(self):
+        # init threading
+        self.m_node_thd = threading.Thread(target=Fwd_node.main_loop, args=(self) )
+
+        #start to work    
+        self.m_node_thd.start()
+    
+    # process rd_msg
+    def process_rd_msg(self, _msg):
+        pass
+
+    # process fb_msg
+    def process_fb_msg(self, _msg):
+        pass
+    
+    # process nor msg
+    def process_nor_msg(self, _msg):
+        pass
+    
     # forwarder loop
-    def fwd_loop(self, _map):
+    def main_loop(self):
         while self.is_work():
             while not self.is_run():
                 if not self.is_work():
@@ -276,9 +290,6 @@ class Node:
             # poll all connects to rcv
             for (_pre_node, _connect) in self.m_connects.items():
                 if _pre_node.is_work():
-                    #debug
-                    # print("%s poll %s"%(self.get_name(), _pre_node.get_name() ) )
-
                     # try receive on each connect
                     _rcv_pipe = _connect.get_rcv_pipe(self.get_id())
 
@@ -299,13 +310,10 @@ class Node:
 
                 # send msg
                 while not self.m_snd_buf.empty():
-                    # print("%s prepare to send"%(self.get_name()) )
-                    
                     # dequeue a msg
                     _msg_to_snd = self.m_snd_buf.get()
                     if _msg_to_snd == None:
                         break
-                    
                     
                     # find next hop by route info on msg
                     _next_hop_node = _msg_to_snd.get_route().find_next_hop(self)
@@ -321,12 +329,38 @@ class Node:
 
                         #do send
                         _snd_pipe.send(_msg_to_snd)
-                        # self.mod_node_status_col(_map)
         
+        # quit main loop
         print("[%s quit]"%(self.get_name()))
 
+# receiver node
+class Rcv_node(Node):
+    def __init__(self, _name, _x, _y, _range):
+        # involve base class init
+        Node.__init__(self, _name, _x, _y, _range)
+    
+    # lunch a node
+    def node_lunch(self):
+        # init threading
+        self.m_node_thd = threading.Thread(target=Rcv_node.main_loop, args=(self) )
+
+        #start to work    
+        self.m_node_thd.start()
+    
+    # process rd_msg
+    def process_rd_msg(self, _msg):
+        pass
+
+    # process fb_msg
+    def process_fb_msg(self, _msg):
+        pass
+    
+    # process nor msg
+    def process_nor_msg(self, _msg):
+        pass
+    
     # receiver loop
-    def rcv_loop(self, _map):
+    def main_loop(self):
         while self.is_work():
             while not self.is_run():
                 if not self.is_work():
@@ -342,19 +376,11 @@ class Node:
 
                     # read all msg on rcv pipe, put all msg got onto m_snd_buf
                     # do recv all
-                    _got_msg = _rcv_pipe.recv()
+                    _got_msgs = _rcv_pipe.recv_all()
 
-                    while not _got_msg is None:
+                    for _got_msg in _got_msgs:
                         print("dst %s: recv %d:\"%s\" from %s"%(self.get_name(), _got_msg.get_id(), _got_msg.get_content(), _pre_node.get_name()) )
-                        # self.mod_node_status_col(_map)
                         self.m_snd_buf.put(_got_msg)
-                        _got_msg = _rcv_pipe.recv()
 
+        # quit main loop
         print("[%s quit]"%(self.get_name()))
-                
-    # wait work done
-    def wait_node(self):
-        self.m_node_thd.join()
-        print("[%s quit]"%(self.get_name()))
-
-    

@@ -84,4 +84,6 @@ def __main__():
 
     _map.stop_all_nodes()
 
+    del _map
+
 __main__()

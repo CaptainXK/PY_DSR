@@ -3,6 +3,8 @@ from Draw_pic import Draw_map
 from Pipe import Pipe
 from Route import Connect, Msg, Route_path
 from queue import Queue
+import threading
+import time
 
 class Map:
     m_w = 0
@@ -17,6 +19,7 @@ class Map:
     m_cur_src=None
     m_cur_dst=None
     m_is_in_rebuild=False
+    m_draw_lock=None
 
     #constructor
     def __init__(self, _w, _h):
@@ -29,35 +32,27 @@ class Map:
         self.m_nodes_nb = 0
         self.m_nodes_list = []
         self.m_con_pool = [Connect() for i in range(100)]
-        self.m_is_in_rebuild=False
 
         #bind double click function
         self.m_draw.bind_dbc(self.del_node)
-
+        #bind stop
+        self.m_draw.bind_btn_stop(self.stop_all_nodes_callback)
+        self.show_all()
+        
         self.m_cur_src=None
         self.m_cur_dst=None
 
-        #bind stop
-        self.m_draw.bind_btn_stop(self.stop_all_nodes_callback)
+        #init draw lock
+        self.m_draw_lock = threading.Lock()
 
-    # build map
-    def do_build(self):
-        self.m_is_in_rebuild = True
-    
-    # build map
-    def done_build(self):
-        self.m_is_in_rebuild = False
-    
-    def is_in_rebuild(self):
-        return self.m_is_in_rebuild
+    # show map 
+    def show_all(self):
+        self.m_draw.show_all()
 
     # update before network rebuild anytime
     def update_all(self, _del_node):
-        # rebuild
-        self.do_build()
-
         self.m_draw.remove_all()
-        self.init_edge()
+        # self.init_edge()
 
         # get current route info of src node
         _cur_src_route_dict = self.get_global_src().get_route()
@@ -80,9 +75,6 @@ class Map:
             self.re_draw_route(_cur_src_route.get_nodes_in_path())
         
         self.put_nodes()
-
-        # rebuild done
-        self.done_build()
 
     # reset all connect in connect pool
     def init_all_con(self):
@@ -118,37 +110,16 @@ class Map:
                     #mark src and dst node
                     self.mark_node(_node)
 
-
-
-    # double click event
-    def del_node(self, event):
-        _x = event.x
-        _y = event.y
-        print("Double click event on (%d, %d)"%(_x, _y))
-        for _node in self.m_nodes_list:
-            if _node.under_cover(_x, _y):
-
-                if _node is self.get_global_src():
-                    print("Can not delete src node")
-                    return
-                elif _node is self.get_global_dst():
-                    print("Can not delete dst node")
-                    return
-                else:
-                    print("Remove %s"%(_node.get_name()))
-                
-                _node.go_die()
-                _node.stop_node()
-                _node_pos = _node.get_pos()
-                self.get_draw().del_point(_node_pos[0], _node_pos[1])
-                self.m_nodes_nb -= 1
-                self.update_all(_node)
-                break
-
     # mark a node
     def mark_node(self, _node):
         _pos = _node.get_pos()
+        # try lock
+        while not self.m_draw_lock.acquire(False):
+            continue
+        # process
         self.m_draw.mark_point(_pos[0], _pos[1])
+        # release
+        self.m_draw_lock.release()
 
     # init all edge
     # any nodes pair that can touch with each other, and both of them is on working, 
@@ -190,7 +161,13 @@ class Map:
             else:
                 idx += 1
 
+        # try lock
+        while not self.m_draw_lock.acquire(False):
+            continue
+        # process
         self.m_draw.del_edge(_node1.get_pos(), _node2.get_pos())
+        # release
+        self.m_draw_lock.release()
         
         return 0
 
@@ -256,11 +233,16 @@ class Map:
         self.m_cur_src = _src_node
         self.m_cur_dst = _dst_node
 
+        # try lock
+        while not self.m_draw_lock.acquire(False):
+            continue
+        # process
         for _node in nodes_in_route:
             node_pos = _node.get_pos()
-
             # switch status of nodes on working
             self.m_draw.mod_point(node_pos[0], node_pos[1])
+        # release
+        self.m_draw_lock.release()
         
         self.re_draw_route(nodes_in_route)
 
@@ -270,9 +252,15 @@ class Map:
     def re_draw_route(self, nodes_in_route):
         # re-draw all edge on route path
         idx=0
+        # try lock
+        while not self.m_draw_lock.acquire(False):
+            continue
+        # process
         while idx < len(nodes_in_route) - 1:
-            self.m_draw.add_edge(nodes_in_route[idx].get_pos(), nodes_in_route[idx+1].get_pos() , _col='green')
+            self.m_draw.add_edge(nodes_in_route[idx].get_pos(), nodes_in_route[idx+1].get_pos() , _fill='green')
             idx += 1
+        # release
+        self.m_draw_lock.release()
     
     # get src
     def get_global_src(self):
@@ -298,16 +286,50 @@ class Map:
                 else:
                     _node.node_lunch('FWD', self)
 
+        # try to wait all thread configure
+        time.sleep(2)
+
+        for _node in self.m_nodes_list:
+            if _node.is_work():
+                _node.start_node()
+
+    # double click event
+    def del_node(self, event):
+        _x = event.x
+        _y = event.y
+        print("Double click event on (%d, %d)"%(_x, _y))
+        for _node in self.m_nodes_list:
+            if _node.under_cover(_x, _y):
+
+                if _node is self.get_global_src():
+                    print("Can not delete src node")
+                    return
+                elif _node is self.get_global_dst():
+                    print("Can not delete dst node")
+                    return
+                else:
+                    print("Remove %s"%(_node.get_name()))
+                
+                _node.go_die()
+                _node.stop_node()
+                _node_pos = _node.get_pos()
+
+                # do delete
+                self.get_draw().del_point(_node_pos[0], _node_pos[1])
+
+                self.m_nodes_nb -= 1
+                self.update_all(_node)
+                break
+
     # stop all node
     # bind to button
     def stop_all_nodes_callback(self, event):
         for _node in self.m_nodes_list:
             if _node.is_work() and _node.is_run():
-                _node.stop_node()
+                _node.go_die()
         
         for _node in self.m_nodes_list:
-            if _node.is_work() and _node.is_run():
-                _node.wait_node()
+            _node.wait_node()
 
         print("All node stop")
 
@@ -315,11 +337,10 @@ class Map:
     def stop_all_nodes(self):
         for _node in self.m_nodes_list:
             if _node.is_work() and _node.is_run():
-                _node.stop_node()
+                _node.go_die()
         
         for _node in self.m_nodes_list:
-            if _node.is_work() and _node.is_run():
-                _node.wait_node()
+            _node.wait_node()
         
         print("All node stop")
     

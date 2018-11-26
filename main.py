@@ -74,9 +74,11 @@ def __main__():
     src_id = 0
     dst_id = len(nodes_list) - 1
 
+    _map.set_src_dst(nodes_list[src_id], nodes_list[dst_id])
+    
     _map.put_nodes()
     
-    _map.cal_route(nodes_list[src_id], nodes_list[dst_id])
+    _map.cal_route()
     
     _map.start_all_nodes()
 

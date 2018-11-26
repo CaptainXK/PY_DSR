@@ -260,7 +260,7 @@ class Node:
             # do snd
             _snd_pipe.send(_msg_to_snd)
             print("sender %s: Send %d:\"%s\" to %s"%(self.get_name(), _msg_to_snd.get_id(), _msg_to_snd.get_content(), _next_hop_node.get_name() ) )
-            self.mod_node_status_col(_map)
+            # self.mod_node_status_col(_map)
 
         print("[%s quit]"%(self.get_name()))
 
@@ -321,7 +321,7 @@ class Node:
 
                         #do send
                         _snd_pipe.send(_msg_to_snd)
-                        self.mod_node_status_col(_map)
+                        # self.mod_node_status_col(_map)
         
         print("[%s quit]"%(self.get_name()))
 
@@ -346,7 +346,7 @@ class Node:
 
                     while not _got_msg is None:
                         print("dst %s: recv %d:\"%s\" from %s"%(self.get_name(), _got_msg.get_id(), _got_msg.get_content(), _pre_node.get_name()) )
-                        self.mod_node_status_col(_map)
+                        # self.mod_node_status_col(_map)
                         self.m_snd_buf.put(_got_msg)
                         _got_msg = _rcv_pipe.recv()
 

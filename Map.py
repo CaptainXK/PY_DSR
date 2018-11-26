@@ -54,8 +54,6 @@ class Map:
 
     # update before network rebuild anytime
     def update_all(self, _del_node):
-        self.m_draw.remove_all()
-        # self.init_edge()
 
         # get current route info of src node
         _cur_src_route_dict = self.get_global_src().get_route()
@@ -63,9 +61,13 @@ class Map:
 
         # check if deleted node is in the route path
         if _cur_src_route.is_in(_del_node):
+            # if need to find a route, re-draw whole canvas first
+            self.m_draw.remove_all()
+
             # stop all nodes in current route path
             for _node in _cur_src_route.get_nodes_in_path():
                 _node.stop_node()
+
 
             #re-build and re-draw route
             nodes_in_path = _cur_src_route.get_nodes_in_path()
@@ -73,10 +75,13 @@ class Map:
             while idx < ( len(nodes_in_path) - 1):
                 self.del_edge(nodes_in_path[idx], nodes_in_path[idx+1])
                 idx += 1
+            
+            # re-draw all node on work after delete route edge
+            self.put_nodes()
 
             # no route path available, stop src node sending msg
-            if not self.cal_route(self.get_global_src(), self.get_global_dst()):
-                self.get_global_src().stop_node()
+            if not self.cal_route():
+                self.m_cur_src.stop_node()
 
             # restart all paused node
             for _node in _cur_src_route.get_nodes_in_path():
@@ -121,16 +126,16 @@ class Map:
                     #mark src and dst node
                     self.mark_node(_node)
 
+    #set src and dst
+    def set_src_dst(self, _src, _dst):
+        self.m_cur_src = _src
+        self.m_cur_dst = _dst
+
     # mark a node
     def mark_node(self, _node):
         _pos = _node.get_pos()
-        # try lock
-        while not self.m_draw_lock.acquire(False):
-            continue
         # process
         self.m_draw.mark_point(_pos[0], _pos[1])
-        # release
-        self.m_draw_lock.release()
 
     # init all edge
     # any nodes pair that can touch with each other, and both of them is on working, 
@@ -184,26 +189,26 @@ class Map:
 
     # calculate the shortest route path for given src and dst
     # BFS to do that
-    def cal_route(self, _src_node, _dst_node):
+    def cal_route(self):
         #BFS to find the shortest path
         nodes_queue = Queue()
 
         #src node enqueue
-        nodes_queue.put(_src_node)
+        nodes_queue.put(self.m_cur_src)
 
         # pre-nodes dist
         # key = current node
         # val = pre-node
         pre_dist = {}
 
-        pre_dist[_src_node] = None
+        pre_dist[self.m_cur_src] = None
 
         cur_node = None
 
         while not nodes_queue.empty():
             cur_node = nodes_queue.get()
 
-            if cur_node is _dst_node:
+            if cur_node is self.m_cur_dst:
                 break
 
             _connect = cur_node.get_connects()
@@ -218,7 +223,7 @@ class Map:
                     #new next hop node enqueue
                     nodes_queue.put(_next_hop_node)
 
-        if not (cur_node is _dst_node):
+        if not (cur_node is self.m_cur_dst):
             print("No available route Path!")
             return False
 
@@ -238,11 +243,7 @@ class Map:
 
         _route.show_route()
 
-        _src_node.set_route(_route, _dst_node)
-
-        # update current global src_node and dst_node
-        self.m_cur_src = _src_node
-        self.m_cur_dst = _dst_node
+        self.m_cur_src.set_route(_route, self.m_cur_dst)
 
         self.re_draw_route(nodes_in_route)
         
@@ -318,7 +319,6 @@ class Map:
                     print("Remove %s"%(_node.get_name()))
                 
                 _node.go_die()
-                _node.stop_node()
                 _node_pos = _node.get_pos()
 
                 # do delete

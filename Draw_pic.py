@@ -62,7 +62,7 @@ class Draw_map:
 
     #remove all
     def remove_all(self):
-        self.m_canvas.delete("oval", "line")
+        self.m_canvas.delete("all")
     
     #bind double-click event
     def bind_dbc(self, call_back):

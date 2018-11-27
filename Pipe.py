@@ -52,5 +52,3 @@ class Pipe:
 
         return _msgs
 
-
-

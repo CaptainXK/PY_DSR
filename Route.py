@@ -50,12 +50,17 @@ class Connect:
 
 class Route_path:
     m_nodes_nb=0
+    
     # nodes from source to destination
     m_nodes_list=[]
+
+    # target dist node id
+    m_dst_node_id=0
 
     def __init__(self):
         self.m_nodes_nb=0
         self.m_nodes_list=[]
+        self.m_dst_node_id=0
 
     # add one node to node list by order
     def add_node(self, _node):
@@ -97,21 +102,25 @@ class Route_path:
         else:
             return False
     
-    #
+    # reverse route
+    def do_reverse(self):
+        if len(self.m_nodes_list) > 0:
+            self.m_nodes_list.reverse()
 
 class Msg:
     m_content=''
     m_route_info=None
     m_id=0
-    m_type=0 # 0 for route discover msg, 
+    m_type=0 # 2 for route discover msg, 
              # 1 for route feedback msg,
-             # 2 for normal msg 
+             # 0 for normal msg 
 
     def __init__(self):
         self.m_route_list = []
         self.m_content=''
         self.m_route_info=None
         self.m_id=0
+        self.m_type = 0
 
     # fill content
     def fill_content(self, _content):
@@ -136,10 +145,22 @@ class Msg:
     # get id
     def get_id(self):
         return self.m_id
+    
+    # set type
+    def set_type(self, _type):
+        self.m_type = _type
+
+    # get type
+    def get_type(self):
+        return self.m_type
 
     # append a node id
     def append_node_id(self, _id):
         _cur_content = self.get_content()
         _cur_content.append(_id)
+
+    # reverse route list
+    def do_reverse(self):
+        self.m_route_info.m_nodes_list.reverse()
 
     

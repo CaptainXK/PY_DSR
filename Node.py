@@ -33,17 +33,16 @@ class Node:
         self.m_name = _name
         self.m_snd_buf = Queue() 
         self.m_rsnd_buf = Queue() 
-
-        #next hop dist
-        # key = next hop node
-        # val = connect to next hop node
-        self.m_connects = {}
-
         self.m_is_work=True
         self.m_is_run=True
         self.m_id = int(re.search(r'([\d]+)', _name, re.I).group(0))
         self.m_point_sz=5
         self.m_type=0
+
+        #next hop dist
+        # key = next hop node
+        # val = connect to next hop node
+        self.m_connects = {}
 
         #route dist
         # key = dst node
@@ -165,9 +164,16 @@ class Node:
 
 # sender node
 class Snd_node(Node):
+    m_dst_node = None
+
     def __init__(self, _name, _x, _y, _range):
         # involve base class init
         Node.__init__(self, _name, _x, _y, _range)
+        self.m_dst_node = []
+
+    # add a dst_node
+    def set_dst(self, _node):
+        self.m_dst_node.append(_node)
     
     # lunch a node
     def node_lunch(self):
@@ -219,7 +225,7 @@ class Snd_node(Node):
             _msg_to_snd = Msg()
 
             # got dst_node
-            _dst_node = _map.get_global_dst()
+            _dst_node = self.m_dst_node
 
             # got route path info to dst node
             _route_to_dst = self.m_route[_dst_node]
@@ -379,8 +385,17 @@ class Rcv_node(Node):
                     _got_msgs = _rcv_pipe.recv_all()
 
                     for _got_msg in _got_msgs:
-                        print("dst %s: recv %d:\"%s\" from %s"%(self.get_name(), _got_msg.get_id(), _got_msg.get_content(), _pre_node.get_name()) )
-                        self.m_snd_buf.put(_got_msg)
+                        # print("dst %s: recv %d:\"%s\" from %s"%(self.get_name(), _got_msg.get_id(), _got_msg.get_content(), _pre_node.get_name()) )
+                        # self.m_snd_buf.put(_got_msg)
+                        _cur_type = _got_msg.get_type()
+                        if _cur_type == 0:   # nor msg
+                            self.process_nor_msg(_got_msg)
+
+                        elif _cur_type == 1: # rd msg
+                            self.process_rd_msg(_got_msg)
+                            
+                        elif _cur_type == 2: # fb msg
+                            self.process_fb_msg(_got_msg)
 
         # quit main loop
         print("[%s quit]"%(self.get_name()))

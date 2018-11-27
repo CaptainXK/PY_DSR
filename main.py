@@ -98,7 +98,8 @@ def __main__():
 
     _map.show_loop()
 
-    # _map.stop_all_nodes()
+    # if turns off diag directly
+    _map.stop_all_nodes()
 
     del _map
 

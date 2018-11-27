@@ -54,41 +54,41 @@ class Map:
 
     # update before network rebuild anytime
     def update_all(self, _del_node):
+        pass
+        # # get current route info of src node
+        # _cur_src_route_dict = self.get_global_src().get_route()
+        # _cur_src_route = _cur_src_route_dict[self.get_global_dst()]
 
-        # get current route info of src node
-        _cur_src_route_dict = self.get_global_src().get_route()
-        _cur_src_route = _cur_src_route_dict[self.get_global_dst()]
+        # # check if deleted node is in the route path
+        # if _cur_src_route.is_in(_del_node):
+        #     # if need to find a route, re-draw whole canvas first
+        #     self.m_draw.remove_all()
 
-        # check if deleted node is in the route path
-        if _cur_src_route.is_in(_del_node):
-            # if need to find a route, re-draw whole canvas first
-            self.m_draw.remove_all()
-
-            # stop all nodes in current route path
-            for _node in _cur_src_route.get_nodes_in_path():
-                _node.stop_node()
+        #     # stop all nodes in current route path
+        #     for _node in _cur_src_route.get_nodes_in_path():
+        #         _node.stop_node()
 
 
-            #re-build and re-draw route
-            nodes_in_path = _cur_src_route.get_nodes_in_path()
-            idx = 0
-            while idx < ( len(nodes_in_path) - 1):
-                self.del_edge(nodes_in_path[idx], nodes_in_path[idx+1])
-                idx += 1
+        #     #re-build and re-draw route
+        #     nodes_in_path = _cur_src_route.get_nodes_in_path()
+        #     idx = 0
+        #     while idx < ( len(nodes_in_path) - 1):
+        #         self.del_edge(nodes_in_path[idx], nodes_in_path[idx+1])
+        #         idx += 1
             
-            # re-draw all node on work after delete route edge
-            self.put_nodes()
+        #     # re-draw all node on work after delete route edge
+        #     self.put_nodes()
 
-            # no route path available, stop src node sending msg
-            if not self.cal_route():
-                self.m_cur_src.stop_node()
+        #     # no route path available, stop src node sending msg
+        #     if not self.cal_route():
+        #         self.m_cur_src.stop_node()
 
-            # restart all paused node
-            for _node in _cur_src_route.get_nodes_in_path():
-                _node.start_node()
-        else:
-            # just re-draw route
-            self.re_draw_route(_cur_src_route.get_nodes_in_path())
+        #     # restart all paused node
+        #     for _node in _cur_src_route.get_nodes_in_path():
+        #         _node.start_node()
+        # else:
+        #     # just re-draw route
+        #     self.re_draw_route(_cur_src_route.get_nodes_in_path())
 
     # reset all connect in connect pool
     def init_all_con(self):
@@ -128,6 +128,7 @@ class Map:
     def set_src_dst(self, _src, _dst):
         self.m_cur_src = _src
         self.m_cur_dst = _dst
+        _src.add_dst_node(_dst)
 
     # mark a node
     def mark_node(self, _node):
@@ -166,97 +167,34 @@ class Map:
                                     con.open_con()
                                     break
 
-    #delete a edge
-    def del_edge(self, _node1, _node2):
-        idx = 0
-        while idx < len(self.m_edges):
-            if self.m_edges[idx] in [[_node1, _node2], [_node2, _node1]]:
-                return 1
-            else:
-                idx += 1
-
-        # process
-        self.m_draw.del_edge(_node1.get_pos(), _node2.get_pos())
+    #draw route path
+    def draw_route(self):
+        # wait src find a route
+        _src_node = self.get_global_src()
+        _dst_node = self.get_global_dst()
+        _route_to_dst = None
+        _src_route_dist = _src_node.get_route()
         
-        return 0
-
-    # calculate the shortest route path for given src and dst
-    # BFS to do that
-    def cal_route(self):
-        #BFS to find the shortest path
-        nodes_queue = Queue()
-
-        #src node enqueue
-        nodes_queue.put(self.m_cur_src)
-
-        # pre-nodes dist
-        # key = current node
-        # val = pre-node
-        pre_dist = {}
-
-        pre_dist[self.m_cur_src] = None
-
-        cur_node = None
-
-        while not nodes_queue.empty():
-            cur_node = nodes_queue.get()
-
-            if cur_node is self.m_cur_dst:
-                break
-
-            _connect = cur_node.get_connects()
-
-            next_nodes = _connect.keys()            
-
-            for _next_hop_node in next_nodes:
-                # avoid loop
-                if (not _next_hop_node in pre_dist.keys()) and _next_hop_node.is_work():
-                    pre_dist[_next_hop_node] = cur_node
-
-                    #new next hop node enqueue
-                    nodes_queue.put(_next_hop_node)
-
-        if not (cur_node is self.m_cur_dst):
-            print("No available route Path!")
-            return False
-
-        # trace back the whole route
-        nodes_in_route = []
-
-        while not cur_node is None:
-            nodes_in_route.append(cur_node)
-            cur_node = pre_dist[cur_node]
-
-        # reverse to ensure list start from src to dst
-        nodes_in_route.reverse()
-
-        _route = Route_path()
-
-        _route.init_by_nodes(nodes_in_route)
-
-        _route.show_route()
-
-        self.m_cur_src.set_route(_route, self.m_cur_dst)
-
-        self.re_draw_route(nodes_in_route)
+        while not _route_to_dst:
+            if _dst_node in _src_route_dist.keys():
+                _route_to_dst = _src_route_dist[_dst_node]
         
-        # process
+        # get route nodes list
+        nodes_in_route = _route_to_dst.get_nodes_in_path()
+                
+        # re-draw all edge on route path
+        idx=0
+
+        # process edge
+        while idx < len(nodes_in_route) - 1:
+            self.m_draw.add_edge(nodes_in_route[idx].get_pos(), nodes_in_route[idx+1].get_pos() , _fill='green')
+            idx += 1
+        
+        # process node
         for _node in nodes_in_route:
             node_pos = _node.get_pos()
             # switch status of nodes on working
             self.m_draw.mod_point(node_pos[0], node_pos[1])
-
-        return True
-
-    #re-draw route path
-    def re_draw_route(self, nodes_in_route):
-        # re-draw all edge on route path
-        idx=0
-
-        # process
-        while idx < len(nodes_in_route) - 1:
-            self.m_draw.add_edge(nodes_in_route[idx].get_pos(), nodes_in_route[idx+1].get_pos() , _fill='green')
-            idx += 1
     
     # get src
     def get_global_src(self):
@@ -282,11 +220,14 @@ class Map:
                 else:
                     _node.node_lunch()
 
-        # try to wait all thread configure
-        time.sleep(5)
-
-        # start all nodes
+        # check if all node ready
         for _node in self.m_nodes_list:
+            if _node.is_work():
+                while not _node.is_ready():
+                    continue
+
+        # start all node by reverse order
+        for _node in reversed(self.m_nodes_list):
             if _node.is_work():
                 _node.start_node()
 

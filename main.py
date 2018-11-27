@@ -1,4 +1,4 @@
-from Node import Node
+from Node import Src_node, Nor_node
 from Map import Map
 import sys
 import getopt
@@ -39,25 +39,13 @@ def load_nodes(_file, _nodes_list):
     for _data_items in _datas:
         _data = _data_items.split(' ')
         node_tmp = None
-        # print("name=%s, x=%d, y=%d, range=%d"%(_data[0], int(_data[1]), int(_data[2]), int(_data[3])))
         if idx == src_id:
-            node_tmp = Snd_node(_data[0], int(_data[1]), int(_data[2]), int(_data[3]))
-        elif idx == dst_id:
-            node_tmp = rcv_node(_data[0], int(_data[1]), int(_data[2]), int(_data[3]))
+            node_tmp = Src_node(_data[0], int(_data[1]), int(_data[2]), int(_data[3]))
         else:
-            node_tmp = fwd_node(_data[0], int(_data[1]), int(_data[2]), int(_data[3]))
+            node_tmp = Nor_node(_data[0], int(_data[1]), int(_data[2]), int(_data[3]))
 
         _nodes_list.append(node_tmp)
 
-        idx += 1
-
-def fake_load_node(_nodes_list):
-    init_pos = [[10, 10, 100], [50, 50, 100], [100,100,200], [150, 150,150], [150, 200, 150]]
-
-    idx=1
-    for x, y, r in init_pos:
-        node = Node(str(idx), x, y, r)
-        _nodes_list.append(node)
         idx += 1
 
 
@@ -67,9 +55,6 @@ def __main__():
     global Y
 
     nodes_list=[]
-
-    # nodes load test
-    # fake_load_node(nodes_list)
 
     data_file_path = cmd_parse_file(sys.argv[1:])
 
@@ -92,9 +77,9 @@ def __main__():
     
     _map.put_nodes()
     
-    _map.cal_route()
-    
     _map.start_all_nodes()
+    
+    _map.draw_route()
 
     _map.show_loop()
 

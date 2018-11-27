@@ -55,7 +55,7 @@ class Route_path:
     m_nodes_list=[]
 
     # target dist node id
-    m_dst_node_id=0
+    m_dst_node=0
 
     def __init__(self):
         self.m_nodes_nb=0
@@ -107,18 +107,27 @@ class Route_path:
         if len(self.m_nodes_list) > 0:
             self.m_nodes_list.reverse()
 
+    # get dst node
+    def get_dst_node(self):
+        return self.m_dst_node
+
+    # set dst node
+    def set_dst_node(self, _dst_node):
+        self.m_dst_node = _dst_node
+
 class Msg:
-    m_content=''
-    m_route_info=None
-    m_id=0
-    m_type=0 # 2 for route discover msg, 
-             # 1 for route feedback msg,
+    m_content='' # content string if needed
+    m_route_info=None # route infomation obj
+    m_id=0 # sequence number of msg
+    m_type=0 # 3 for route disable msg
+             # 2 for route feedback msg, 
+             # 1 for route discover msg,
              # 0 for normal msg 
 
     def __init__(self):
         self.m_route_list = []
         self.m_content=''
-        self.m_route_info=None
+        self.m_route_info=Route_path()
         self.m_id=0
         self.m_type = 0
 
@@ -159,8 +168,5 @@ class Msg:
         _cur_content = self.get_content()
         _cur_content.append(_id)
 
-    # reverse route list
-    def do_reverse(self):
-        self.m_route_info.m_nodes_list.reverse()
 
     

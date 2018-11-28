@@ -23,11 +23,11 @@ class Draw_map:
         # self.m_btn_stop.pack()
 
     #circle : center point (_x, _y) ,R=_r
-    def put_point(self, _x, _y, _fill = 'black', _dash=None, _width=1, _outl=None, _r=0):
+    def put_point(self, _x, _y, _fill = 'green', _dash=None, _width=1, _outl=None, _r=0):
         if _r == 0:
             _r = self.m_point_size
         
-        self.m_canvas.create_oval(_x-_r, _y-_r, _x+_r, _y+_r, fill=_fill, outline = _outl, width = _width, dash = _dash)
+        self.m_canvas.create_oval(_x-_r, _y-_r, _x+_r, _y+_r, fill=_fill, outline=_outl, width=_width, dash=_dash, tag='node')
         self.m_tk.update()
 
     # mark a point
@@ -40,11 +40,11 @@ class Draw_map:
     
     #delete a point
     def del_point(self, _x, _y):
-        self.put_point(_x, _y, _r=self.m_point_size+2, _fill='white', _outl='white')
+        self.put_point(_x, _y, _r=self.m_point_size, _fill='black')
 
     #add a edge
     def add_edge(self, _pos_1, _pos_2, _fill='black', _dash=None, _width=3):
-        self.m_canvas.create_line(_pos_1[0], _pos_1[1], _pos_2[0], _pos_2[1], fill=_fill, width=_width, dash=_dash)
+        self.m_canvas.create_line(_pos_1[0], _pos_1[1], _pos_2[0], _pos_2[1], fill=_fill, width=_width, dash=_dash, tag='line')
         self.m_tk.update()
     
     #delete a edge
@@ -63,6 +63,14 @@ class Draw_map:
     #remove all
     def remove_all(self):
         self.m_canvas.delete("all")
+
+    #remove node 
+    def remove_node(self):
+        self.m_canvas.delete("node")
+    
+    #remove route line 
+    def remove_route(self):
+        self.m_canvas.delete("line")
     
     #bind double-click event
     def bind_dbc(self, call_back):

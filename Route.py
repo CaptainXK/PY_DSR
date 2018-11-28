@@ -54,13 +54,21 @@ class Route_path:
     # nodes from source to destination
     m_nodes_list=[]
 
-    # target dist node id
-    m_dst_node=0
+    # dst node
+    m_dst_node=None
+
+    # src node
+    m_src_node=None
 
     def __init__(self):
         self.m_nodes_nb=0
         self.m_nodes_list=[]
-        self.m_dst_node_id=0
+        self.m_dst_node=None
+        self.m_src_node=None
+
+    # get nodes number
+    def get_nodes_nb(self):
+        return self.m_nodes_nb
 
     # add one node to node list by order
     def add_node(self, _node):
@@ -115,11 +123,22 @@ class Route_path:
     def set_dst_node(self, _dst_node):
         self.m_dst_node = _dst_node
 
+    # get src node
+    def get_src_node(self):
+        return self.m_src_node
+
+    # set src node
+    def set_src_node(self, _src_node):
+        self.m_src_node = _src_node
+
 class Msg:
     m_content='' # content string if needed
+
     m_route_info=None # route infomation obj
+
     m_id=0 # sequence number of msg
-    m_type=0 # 3 for route disable msg
+
+    m_type=0 # 3 for route force feedback msg, normal node sends it to src node after re-build route
              # 2 for route feedback msg, 
              # 1 for route discover msg,
              # 0 for normal msg 

@@ -34,7 +34,7 @@ def load_nodes(_file, _nodes_list):
     # first node is src node
     # last node is dst node
     src_id = 0
-    dst_id = len(_datas) - 1
+
     idx = 0
     for _data_items in _datas:
         _data = _data_items.split(' ')
@@ -79,8 +79,6 @@ def __main__():
     
     _map.start_all_nodes()
     
-    _map.draw_route()
-
     _map.show_loop()
 
     # if turns off diag directly

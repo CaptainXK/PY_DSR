@@ -8,8 +8,6 @@ import datetime
 import time
 import copy
 
-gl_node_type={'SRC':0, 'FWD':1, 'DST':2}
-
 # Node base class
 class Node:
     m_is_work=True # node is available or not
@@ -91,6 +89,10 @@ class Node:
         if _tar_node.is_work() and _tar_node in self.m_connects.keys():
             _snd_pipe = self.m_connects[_tar_node].get_snd_pipe(self.m_id)
             _snd_pipe.send(_msg)
+            return True
+        # tar_node offline
+        else:
+            return False
     
     #recv
     def recv_msg(self, _tar_node):
@@ -179,6 +181,8 @@ class Src_node(Node):
     m_test_content = 'I\'ve got you in my sight'
     m_rd_pit = 0 # 0 means no route discover request is pending, otherwise at least one request does
     m_cur_msg_id=0
+    m_draw_route_callback=None
+    m_map=None
 
     def __init__(self, _name, _x, _y, _range):
         # involve base class init
@@ -186,15 +190,21 @@ class Src_node(Node):
         self.m_dst_nodes = []
         self.m_rd_pit = 0
         self.m_cur_msg_id = 0
+        self.m_draw_route_callback=None
+        self.m_map=None
 
     # add a dst_node
     def add_dst_node(self, _node):
         self.m_dst_nodes.append(_node)
-    
+
     # lunch a node
-    def node_lunch(self):
+    def node_lunch(self, draw_route_callback, _map):
+        # set draw route callback
+        self.m_draw_route_callback = draw_route_callback
+        self.m_map = _map
+
         # init threading
-        self.m_node_thd = threading.Thread(target=Src_node.main_loop, args=(self,) )
+        self.m_node_thd = threading.Thread(target=Src_node.main_loop, args=(self,))
 
         #start to work    
         self.m_node_thd.start()
@@ -220,6 +230,9 @@ class Src_node(Node):
 
                 # set type
                 _rd_msg.set_type(1)
+
+                # fill content
+                _rd_msg.fill_content('Route discover')
 
                 # set dst node
                 _route_info.set_dst_node(_dst_node)
@@ -248,30 +261,51 @@ class Src_node(Node):
 
                 # parse all msgs
                 for _msg in _msgs:
-                    print("%s : recv fb msg"%(self.get_name()))
+                    # print("%s : recv fb msg"%(self.get_name()))
                     # got a feedback route
-                    if _msg.get_type() == 2:
+                    if _msg.get_type() in [2, 3]:
                         # fetch route info in msg
                         _route_info = _msg.get_route()
 
                         # get dst node
                         _dst_node = _route_info.get_dst_node()
 
-                        # add (_dst_node, _route_info) pair into route dist
-                        _route_info.do_reverse()
+                        # a force route update msg
+                        if _msg.get_type() == 3:
+                            # show somthing
+                            _route_info.do_reverse()
+                            print("%s : got a re-build route to %s"%(self.get_name(), _dst_node.get_name()))
+                            _route_info.show_route()
+
+                        # when route info to dst node is empty
+                        # or new route is shorter
+                        # update or insert (_dst_node, _route_info) pair into route dist
+                        elif not _dst_node in self.m_route.keys() or (not self.m_route[_dst_node]) or ( _route_info.get_nodes_nb() < self.m_route[_dst_node].get_nodes_nb() ):
+                            # show somthing
+                            _route_info.do_reverse()
+                            print("%s : got a new or better route info to %s"%(self.get_name(), _dst_node.get_name()))
+                            _route_info.show_route()
+                        
+                        # do nothing
+                        else:
+                            # no react
+                            continue
+
+                        # set new route info                            
                         self.m_route[_dst_node] = Route_path()
                         self.m_route[_dst_node].init_by_nodes(_route_info.get_nodes_in_path())
                         self.m_route[_dst_node].set_dst_node(_route_info.get_dst_node())
+                        self.m_route[_dst_node].set_src_node(self)
+
+                        # re-draw route path
+                        self.m_draw_route_callback(self.m_map)
 
                         # add _dst_node to dst_node list
-                        self.m_dst_nodes.append(_dst_node)
+                        if not _dst_node in self.m_dst_nodes:
+                            self.m_dst_nodes.append(_dst_node)
 
                         # zero rd pit flag
                         self.m_rd_pit = 0
-
-                        # show somthing
-                        print("%s : got a route info to %s"%(self.get_name(), _dst_node.get_name()))
-                        _route_info.show_route()
 
     # send nor msg
     def send_nor_msg(self):
@@ -283,22 +317,20 @@ class Src_node(Node):
             # set msg type
             _msg_to_snd.set_type(0)
 
-            # got route path info to dst node
-
             if not _dst_node in self.m_route.keys():
                 return
             _route_to_dst = self.m_route[_dst_node]
 
+            # set src node
+            _route_to_dst.set_src_node(self)
+
             # find next hop on current route
             _next_hop_node = _route_to_dst.find_next_hop(self)
             if not _next_hop_node or not _next_hop_node.is_work():
+                print("%s : next hop node offline, re-build route"%(self.get_name()))
+                self.m_route[_dst_node]=None
+                self.m_rd_pit = 0
                 continue
-
-            # find connect to next hop node
-            _next_hop_con = self.get_connect(_next_hop_node)
-
-            # find snd pipe to next hop node
-            _snd_pipe = _next_hop_con.get_snd_pipe(self.get_id())
 
             # fill test content
             _msg_to_snd.fill_content(self.m_test_content)
@@ -311,8 +343,7 @@ class Src_node(Node):
             self.m_cur_msg_id += 1
 
             # do snd
-            _snd_pipe.send(_msg_to_snd)
-            # print("sender %s: Send %d:\"%s\" to %s"%(self.get_name(), _msg_to_snd.get_id(), _msg_to_snd.get_content(), _next_hop_node.get_name() ) )
+            self.send_msg(_next_hop_node, _msg_to_snd)
     
     # sender loop
     def main_loop(self):
@@ -323,7 +354,6 @@ class Src_node(Node):
         # send one msg every 3 seconds
         pre_time = datetime.datetime.now()
         cur_time = 0
-        msg_idx = 0
 
         while self.is_work():
             while not self.is_run():
@@ -338,8 +368,8 @@ class Src_node(Node):
             # check if it is time to send
             if (cur_time - pre_time).seconds < 3:
                 # recv and continue
-                if len(self.m_route.keys()) == 0:
-                    self.recv_fb_or_nat_msg()
+                # if len(self.m_route.keys()) == 0:
+                self.recv_fb_or_nat_msg()
                 continue
             else:
                 # it is time
@@ -347,7 +377,7 @@ class Src_node(Node):
                 pre_time = cur_time
 
             # if there is at least one dst node, do send normal msg
-            if len(self.m_route.keys()) > 0:
+            if len(self.m_route.keys()) > 0 and ( not None in list(self.m_route.values()) ):
                 self.send_nor_msg()
             
             # otherwise, begin a route discover boardcast if no route discover request is pending
@@ -361,18 +391,70 @@ class Src_node(Node):
 
 # receiver node
 class Nor_node(Node):
+    m_src_node=None
+    m_in_rebuild=False
+    m_pre_route_nodes_list=None
+
     def __init__(self, _name, _x, _y, _range):
         # involve base class init
         Node.__init__(self, _name, _x, _y, _range)
+
+        # real src node, after receive fd msg after re-build route
+        # replace the src node in msg and send it to real src node
+        self.m_src_node=None
+
+        self.m_in_rebuild=False
+
+        self.m_pre_route_nodes_list=[]
     
     # lunch a node
     def node_lunch(self):
         # init threading
         self.m_node_thd = threading.Thread(target=Nor_node.main_loop, args=(self,) )
 
-        #start to work    
+        # start to work    
         self.m_node_thd.start()
     
+    def process_route_offline(self, _msg, _offline_node, _pre_node):
+        if self.m_in_rebuild:
+            return
+        else:
+            self.m_in_rebuild=True
+
+        # store the pre-nodes in current path
+        if len(self.m_pre_route_nodes_list) == 0:
+            for _node in _msg.get_route().get_nodes_in_path():
+                if _node is self:
+                    break
+                else:
+                    self.m_pre_route_nodes_list.append(_node)
+            
+        for _to_node in self.m_connects.keys():
+            # don't send to pre-node and offline node
+            if _to_node in [_offline_node, _pre_node]:
+                continue
+
+            # prepare a new route discover msg
+            _rd_msg = Msg()
+            _rd_msg.set_type(1)
+
+            # get route info
+            _in_route_info = _msg.get_route()
+            _out_route_info = _rd_msg.get_route()
+
+            # backup src node
+            self.m_src_node = _in_route_info.get_src_node()
+
+            # fill src and dst node to new rd msg
+            _out_route_info.set_src_node(self)
+            _out_route_info.set_dst_node(_in_route_info.get_dst_node())
+
+            # add a node
+            _out_route_info.add_node(self)
+
+            # do send
+            self.send_msg(_to_node, _rd_msg)
+
     # process rd_msg
     def process_rd_msg(self, _pre_node, _msg):
         # get route info in msg
@@ -398,29 +480,121 @@ class Nor_node(Node):
             if _msg_route_info.is_in(self):
                 return
             else:
-            # broadcast route discover msg to all neighbor nodes but the node that msg came from
+                # broadcast route discover msg to all neighbor nodes but the node that msg came from
                 _msg_route_info.add_node(self)
+                _nodes_in_path = _msg_route_info.get_nodes_in_path()
+
                 for (_to_node, _connect) in self.m_connects.items():
+                    # duplicate current msg
+                    _dup_msg = Msg()
+
+                    # duplicate content
+                    _dup_msg.fill_content(_msg.get_content())
+
+                    # set type
+                    _dup_msg.set_type(1)
+
+                    # duplicate a nodes list from _msg
+                    _dup_msg.get_route().init_by_nodes( _nodes_in_path )
+
+                    # duplicate dst node and src node
+                    _dst_node = _msg_route_info.get_dst_node()
+                    _src_node = _msg_route_info.get_src_node()
+                    _dup_msg.get_route().set_dst_node(_dst_node)
+                    _dup_msg.get_route().set_src_node(_src_node)
+
                     # do not send to
                     if not (_to_node is _pre_node):
-                        self.send_msg(_to_node, _msg)
+                        self.send_msg(_to_node, _dup_msg)
 
     # process fb_msg
     def process_fb_msg(self, _msg):
         # get route info in msg
         _msg_route_info = _msg.get_route()
 
-        # find next hop node
-        _to_node = _msg_route_info.find_next_hop(self)
+        # if a fb msg's src node is a normal node,
+        # that means a re-build route build done
+        if _msg.get_type() == 2 and _msg_route_info.get_src_node() is self:
+            print("%s : recv a re-build sub-route"%(self.get_name()))
+            _re_build_route_info = _msg.get_route()
+            _new_route_info = None
 
-        if not _to_node:
-            return
+            # update route info of msgs in re-send buff
+            # and send them
+            while not self.m_rsnd_buf.empty():
+                # fetch a re-send msg
+                _re_snd_msg = self.m_rsnd_buf.get()
+                _re_snd_route_info = _re_snd_msg.get_route()
 
-        # do send
-        self.send_msg(_to_node, _msg)
+                # if new route info is still None
+                if not _new_route_info:
+                    # update its route info
+                    _new_route_info = Route_path()
+                    _new_route_info.set_dst_node( _re_snd_route_info.get_dst_node() )
+                    _new_route_info.set_src_node( _re_snd_route_info.get_src_node() )
+
+                    # insert re-build route nodes list into new route info
+                    _new_route_info.init_by_nodes(_re_build_route_info.get_nodes_in_path())
+                    # reverse it to flush re-send buff
+                    _new_route_info.get_nodes_in_path().reverse()
+
+                    for _node in _re_snd_route_info.get_nodes_in_path():
+                        # fetch pre-nodes before current nodes in re-send route nodes list
+                        if _node is self:
+                            break
+                        _new_route_info.get_nodes_in_path().insert(0, _node)
+                        _nodes_nb = _new_route_info.get_nodes_nb()
+                        _nodes_nb += 1
+
+                # update route info of re-send msg
+                _re_snd_msg.set_route_info(_new_route_info)
+
+                # do send
+                _next_hop_node = _new_route_info.find_next_hop(self)
+                self.send_msg(_next_hop_node, _re_snd_msg)
+            
+            # if no re-send msg
+            # still need to create a new sub_route_info
+            if not _new_route_info:
+                _new_route_info = Route_path()
+                _new_route_info.set_dst_node( _msg.get_route().get_dst_node() )
+                _new_route_info.set_src_node( _msg.get_route().get_src_node() )
+                
+                # link with re-build route info's node's list
+                for _node in _re_build_route_info.get_nodes_in_path():
+                    _new_route_info.add_node(_node)
+                
+                # insert prefix node info
+                for _node in self.m_pre_route_nodes_list:
+                    _new_route_info.add_node(_node)
+                
+            # notify src node
+            _notify_route_info = Route_path()
+            _notify_route_info.set_dst_node( _new_route_info.get_dst_node() )
+            _notify_route_info.set_src_node( _new_route_info.get_src_node() )
+            _notify_route_info.init_by_nodes( _new_route_info.get_nodes_in_path() )
+            _notify_route_info.get_nodes_in_path().reverse()
+            _msg.set_route_info(_notify_route_info)
+            _msg.set_type(3)
+
+            # keep forward it
+            self.process_fb_msg(_msg)
+
+            self.m_in_rebuild=False
+        
+        # just forward it
+        else:
+            # find next hop node
+            _to_node = _msg_route_info.find_next_hop(self)
+
+            if not _to_node:
+                return
+
+            # do send
+            self.send_msg(_to_node, _msg)
 
     # process nor msg
-    def process_nor_msg(self, _msg):
+    def process_nor_msg(self, _pre_node, _msg):
         # get route info in msg
         _msg_route_info = _msg.get_route()
 
@@ -442,8 +616,16 @@ class Nor_node(Node):
             # find next hop node
             _to_node = _msg_route_info.find_next_hop(self)
 
-            # do send
-            self.send_msg(_to_node, _msg)
+            # try do send
+            if not self.send_msg(_to_node, _msg):
+                # if node offline, trigger process func
+                print("%s : Next hop node offline, try re-build route then notify src node"%(self.get_name()))
+
+                # enqueue re-send buf
+                self.m_rsnd_buf.put(_msg)
+
+                # process offline node
+                self.process_route_offline(_msg, _to_node, _pre_node)
     
     # receiver loop
     def main_loop(self):
@@ -474,13 +656,13 @@ class Nor_node(Node):
                         _cur_type = _got_msg.get_type()
                         if _cur_type == 0:   # nor msg
                             # print("%s : recv %d:\"%s\" from %s"%(self.get_name(), _got_msg.get_id(), _got_msg.get_content(), _pre_node.get_name()) )
-                            self.process_nor_msg(_got_msg)
+                            self.process_nor_msg(_pre_node, _got_msg)
 
                         elif _cur_type == 1: # rd msg
                             # print("%s : recv rd msg from %s"%(self.get_name(), _pre_node.get_name()) )
                             self.process_rd_msg(_pre_node, _got_msg)
                             
-                        elif _cur_type == 2: # fb msg
+                        elif _cur_type in [2, 3]: # fb msg
                             # print("%s : recv fb msg from %s"%(self.get_name(), _pre_node.get_name()) )
                             self.process_fb_msg(_got_msg)
                         else:

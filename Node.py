@@ -183,6 +183,8 @@ class Src_node(Node):
     m_cur_msg_id=0
     m_draw_route_callback=None
     m_map=None
+    m_cur_seq=-1
+    m_last_ack=-1
 
     def __init__(self, _name, _x, _y, _range):
         # involve base class init
@@ -192,6 +194,8 @@ class Src_node(Node):
         self.m_cur_msg_id = 0
         self.m_draw_route_callback=None
         self.m_map=None
+        self.m_cur_seq=-1
+        self.m_last_ack=-1
 
     # add a dst_node
     def add_dst_node(self, _node):
@@ -263,7 +267,7 @@ class Src_node(Node):
         # send rd msg in next sending circle
 
     # process fb_msg
-    def recv_fb_or_noti_msg(self):
+    def recv_fb_or_noti_or_ack_msg(self):
         # poll all neighborhood nodes to wait feedback msg
         for _node, _connect in self.m_connects.items():
             if _node.is_work():
@@ -318,9 +322,20 @@ class Src_node(Node):
 
                         # zero rd pit flag
                         self.m_rd_pit = 0
+                    
+                    # recv ack
+                    elif _msg.get_type() == 1:
+                        print("%s : msg%d has been acked"%(self.get_name(), _msg.get_id()))
+                        self.m_last_ack += 1
 
     # send nor msg
     def send_nor_msg(self):
+        # last msg is still un-acked, don't send new one
+        if self.m_cur_seq > self.m_last_ack:
+            return
+        else:
+            self.m_cur_seq += 1
+
         # send to all dst nodes
         for _dst_node in self.m_dst_nodes:
             # new a empty msg
@@ -351,8 +366,7 @@ class Src_node(Node):
             _msg_to_snd.set_route_info(_route_to_dst)
 
             # set id
-            _msg_to_snd.set_id(self.m_cur_msg_id)
-            self.m_cur_msg_id += 1
+            _msg_to_snd.set_id(self.m_cur_seq)
 
             # do snd
             self.send_msg(_next_hop_node, _msg_to_snd)
@@ -381,7 +395,7 @@ class Src_node(Node):
             if (cur_time - pre_time).seconds < 3:
                 # recv and continue
                 # if len(self.m_route.keys()) == 0:
-                self.recv_fb_or_noti_msg()
+                self.recv_fb_or_noti_or_ack_msg()
                 continue
             else:
                 # it is time
@@ -405,6 +419,7 @@ class Src_node(Node):
 class Nor_node(Node):
     m_src_node=None
     m_pre_route_nodes_list=None
+    m_cur_ack = 0
 
     def __init__(self, _name, _x, _y, _range):
         # involve base class init
@@ -415,6 +430,8 @@ class Nor_node(Node):
         self.m_src_node=None
 
         self.m_pre_route_nodes_list=[]
+
+        self.m_cur_ack=0
     
     # lunch a node
     def node_lunch(self):
@@ -423,6 +440,25 @@ class Nor_node(Node):
 
         # start to work    
         self.m_node_thd.start()
+
+    def process_response(self, _pre_node, _msg):
+        # prepare ack msg
+        _ack_msg = Msg()
+        _ack_msg.set_type(1)
+        _ack_msg.set_id(self.m_cur_ack)
+
+        # fill ack msg
+        _msg_route_info = _msg.get_route()
+        _ack_route_info = _ack_msg.get_route()
+        _ack_route_info.set_dst_node(_msg_route_info.get_src_node())
+        _ack_route_info.set_src_node(_msg_route_info.get_dst_node())
+        _ack_route_info.init_by_nodes(_msg_route_info.get_nodes_in_path())
+        _ack_route_info.get_nodes_in_path().reverse()
+
+        # do send
+        print("%s : send ack for nor msg %d"%(self.get_name(), _ack_msg.get_id()))
+        self.send_msg(_pre_node, _ack_msg)
+        self.m_cur_ack += 1
     
     def process_route_offline(self, _msg, _offline_node, _pre_node):
         # prepare node offline notification msg
@@ -464,7 +500,7 @@ class Nor_node(Node):
             _msg.set_type(3)
 
             #do send
-            self.process_fb_or_noti_msg(_msg)
+            self.process_fb_or_noti_or_ack_msg(_msg)
             print("%s : dst node has received a route discover msg and response"%(self.get_name()))
         # if i am not the dst node
         else:
@@ -500,7 +536,7 @@ class Nor_node(Node):
                         self.send_msg(_to_node, _dup_msg)
 
     # process fb_msg
-    def process_fb_or_noti_msg(self, _msg):
+    def process_fb_or_noti_or_ack_msg(self, _msg):
         # get route info in msg
         _msg_route_info = _msg.get_route()
 
@@ -534,6 +570,9 @@ class Nor_node(Node):
 
             # show somthing
             print("%s : i receive one msg, id=%d, content='%s'"%(self.get_name(), _msg_id, _msg_content) )
+
+            # response ack
+            self.process_response(_pre_node, _msg)
         else:
             # find next hop node
             _to_node = _msg_route_info.find_next_hop(self)
@@ -581,9 +620,9 @@ class Nor_node(Node):
                             # print("%s : recv rd msg from %s"%(self.get_name(), _pre_node.get_name()) )
                             self.process_rd_msg(_pre_node, _got_msg)
                             
-                        elif _cur_type in [3, 4]: # fb msg
+                        elif _cur_type in [1, 3, 4]: # fb msg
                             # print("%s : recv fb msg from %s"%(self.get_name(), _pre_node.get_name()) )
-                            self.process_fb_or_noti_msg(_got_msg)
+                            self.process_fb_or_noti_or_ack_msg(_got_msg)
                         else:
                             pass
                             # print("%s : waiting..."%(self.get_name()) )

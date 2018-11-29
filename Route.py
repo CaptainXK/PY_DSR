@@ -138,9 +138,10 @@ class Msg:
 
     m_id=0 # sequence number of msg
 
-    m_type=0 # 3 for route force feedback msg, normal node sends it to src node after re-build route
-             # 2 for route feedback msg, 
-             # 1 for route discover msg,
+    m_type=0 # 4 for node offline notification msg
+             # 3 for route feedback msg
+             # 2 for route discover msg
+             # 1 for ack msg
              # 0 for normal msg 
 
     def __init__(self):

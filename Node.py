@@ -185,6 +185,7 @@ class Src_node(Node):
     m_map=None
     m_cur_seq=-1
     m_last_ack=-1
+    m_re_send=False
 
     def __init__(self, _name, _x, _y, _range):
         # involve base class init
@@ -196,6 +197,7 @@ class Src_node(Node):
         self.m_map=None
         self.m_cur_seq=-1
         self.m_last_ack=-1
+        self.m_re_send=False
 
     # add a dst_node
     def add_dst_node(self, _node):
@@ -264,7 +266,31 @@ class Src_node(Node):
         if _dst_node in self.m_route.keys():
             self.m_route[_dst_node] = None
             self.m_rd_pit = 0
+        
         # send rd msg in next sending circle
+
+    # re-send
+    def process_re_send(self):
+        # re-send msg in re-send buff
+        while not self.m_rsnd_buf.empty():
+            # fetch re-send msg
+            _re_send_msg = self.m_rsnd_buf.get()
+
+            # get dst
+            _dst_node = _re_send_msg.get_route().get_dst_node()
+
+            # replace old route info
+            _re_send_msg.set_route_info(self.m_route[_dst_node])
+
+            # find next hop
+            _next_hop_node = _re_send_msg.get_route().find_next_hop(self)
+
+            if _next_hop_node.is_work():
+                self.send_msg(_next_hop_node, _re_send_msg)
+        
+        # modify re-send flag
+        self.m_re_send = False
+
 
     # process fb_msg
     def recv_fb_or_noti_or_ack_msg(self):
@@ -290,17 +316,25 @@ class Src_node(Node):
 
                         # a node noti msg
                         if _msg.get_type() == 4:
+                            # process node offline case
                             self.process_route_offline(_msg)
+
+                            # update re-send status flag
+                            self.m_re_send = True
+
                             continue
 
                         # when route info to dst node is empty
                         # or new route is shorter
                         # update or insert (_dst_node, _route_info) pair into route dist
-                        elif not _dst_node in self.m_route.keys() or (not self.m_route[_dst_node]) or ( _route_info.get_nodes_nb() < self.m_route[_dst_node].get_nodes_nb() ):
+                        elif (not _dst_node in self.m_route.keys()) or (not self.m_route[_dst_node]) or ( _route_info.get_nodes_nb() < self.m_route[_dst_node].get_nodes_nb() ):
                             # show somthing
                             _route_info.do_reverse()
                             print("%s : got a new or better route info to %s"%(self.get_name(), _dst_node.get_name()))
                             _route_info.show_route()
+
+                            # re-send if need
+                            self.m_re_send = True
                         
                         # do nothing
                         else:
@@ -325,14 +359,25 @@ class Src_node(Node):
                     
                     # recv ack
                     elif _msg.get_type() == 1:
-                        print("%s : msg%d has been acked"%(self.get_name(), _msg.get_id()))
+                        print("%s : msg %d has been acked"%(self.get_name(), _msg.get_id()))
                         self.m_last_ack += 1
+                        while not self.m_rsnd_buf.empty():
+                            self.m_rsnd_buf.get()
 
     # send nor msg
     def send_nor_msg(self):
-        # last msg is still un-acked, don't send new one
-        if self.m_cur_seq > self.m_last_ack:
+        # if need re_send
+        if self.m_re_send:
+            print("%s : re-send all msg in re-send buffer"%(self.get_name()))
+            self.process_re_send()
             return
+
+        # else, last msg is still un-acked, don't send new one
+        if self.m_cur_seq > self.m_last_ack:
+            print("%s : wait ack"%(self.get_name()))
+            return
+        
+        # else, just update seq and send a new normal msg
         else:
             self.m_cur_seq += 1
 
@@ -351,14 +396,6 @@ class Src_node(Node):
             # set src node
             _route_to_dst.set_src_node(self)
 
-            # find next hop on current route
-            _next_hop_node = _route_to_dst.find_next_hop(self)
-            if not _next_hop_node or not _next_hop_node.is_work():
-                print("%s : next hop node offline, re-build route"%(self.get_name()))
-                self.m_route[_dst_node]=None
-                self.m_rd_pit = 0
-                continue
-
             # fill test content
             _msg_to_snd.fill_content(self.m_test_content)
 
@@ -368,9 +405,20 @@ class Src_node(Node):
             # set id
             _msg_to_snd.set_id(self.m_cur_seq)
 
+            # put it into re-send buff first
+            self.m_rsnd_buf.put(_msg_to_snd)
+
+            # find next hop on current route
+            _next_hop_node = _route_to_dst.find_next_hop(self)
+            if not _next_hop_node or not _next_hop_node.is_work():
+                print("%s : next hop node offline, re-build route"%(self.get_name()))
+                self.m_route[_dst_node]=None
+                self.m_rd_pit = 0
+                continue
+            
             # do snd
             self.send_msg(_next_hop_node, _msg_to_snd)
-    
+
     # sender loop
     def main_loop(self):
         # notify Map that i am ready
@@ -445,6 +493,11 @@ class Nor_node(Node):
         # prepare ack msg
         _ack_msg = Msg()
         _ack_msg.set_type(1)
+        
+        # check seq and ack
+        _msg_id = _msg.get_id()
+
+        # fill ack number
         _ack_msg.set_id(self.m_cur_ack)
 
         # fill ack msg

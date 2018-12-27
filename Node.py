@@ -186,6 +186,7 @@ class Src_node(Node):
     m_cur_seq=-1
     m_last_ack=-1
     m_re_send=False
+    m_last_offline_node_id=-1
 
     def __init__(self, _name, _x, _y, _range):
         # involve base class init
@@ -198,6 +199,7 @@ class Src_node(Node):
         self.m_cur_seq=-1
         self.m_last_ack=-1
         self.m_re_send=False
+        self.m_last_offline_node_id=-1
 
     # add a dst_node
     def add_dst_node(self, _node):
@@ -238,7 +240,11 @@ class Src_node(Node):
                 _rd_msg.set_type(2)
 
                 # fill content
-                _rd_msg.fill_content('Route discover')
+                # if last offline node id > -1, fill this node id into content
+                if self.m_last_offline_node_id != -1:
+                    _rd_msg.fill_content(str(self.m_last_offline_node_id))
+                else:
+                    _rd_msg.fill_content("")
 
                 # set dst node
                 _route_info.set_dst_node(_dst_node)
@@ -252,12 +258,16 @@ class Src_node(Node):
             # do send to one neighborhood node
             if len(_msgs) > 0:
                 _snd_pipe.send_all(_msgs)
-                print("%s : I just sended one rd msg to %s"%(self.get_name(), _node.get_name()))
+                for _msg in _msgs:
+                    print("%s : I just sended one rd msg to %s, content=\"%s\""%(self.get_name(), _node.get_name(), _msg.get_content()) )
 
     # process route node offline
     def process_route_offline(self, _noti_msg):
         _offline_node_id = int(_noti_msg.get_content())
         print("%s : node%d offline , rebuild route..."%(self.get_name(), _offline_node_id))
+
+        # update last offline node id
+        self.m_last_offline_node_id = _offline_node_id
 
         # get dst node
         _dst_node = _noti_msg.get_route().get_dst_node()
@@ -466,8 +476,8 @@ class Src_node(Node):
 # receiver node
 class Nor_node(Node):
     m_src_node=None
-    m_pre_route_nodes_list=None
     m_cur_ack = 0
+    m_cur_best_route_list = []
 
     def __init__(self, _name, _x, _y, _range):
         # involve base class init
@@ -476,8 +486,8 @@ class Nor_node(Node):
         # real src node, after receive fd msg after re-build route
         # replace the src node in msg and send it to real src node
         self.m_src_node=None
-
-        self.m_pre_route_nodes_list=[]
+        
+        self.m_cur_best_route_list = []
 
         self.m_cur_ack=0
     
@@ -665,6 +675,7 @@ class Nor_node(Node):
                     for _got_msg in _got_msgs:
                         # print("%s : recv %d:\"%s\" from %s"%(self.get_name(), _got_msg.get_id(), _got_msg.get_content(), _pre_node.get_name()) )
                         _cur_type = _got_msg.get_type()
+
                         if _cur_type == 0:   # nor msg
                             # print("%s : recv %d:\"%s\" from %s"%(self.get_name(), _got_msg.get_id(), _got_msg.get_content(), _pre_node.get_name()) )
                             self.process_nor_msg(_pre_node, _got_msg)
@@ -676,6 +687,7 @@ class Nor_node(Node):
                         elif _cur_type in [1, 3, 4]: # fb msg
                             # print("%s : recv fb msg from %s"%(self.get_name(), _pre_node.get_name()) )
                             self.process_fb_or_noti_or_ack_msg(_got_msg)
+
                         else:
                             pass
                             # print("%s : waiting..."%(self.get_name()) )

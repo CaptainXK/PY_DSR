@@ -109,6 +109,15 @@ class Route_path:
             return True
         else:
             return False
+
+    # id is in route
+    def id_is_in(self, _id):
+        ret = False
+        for _node in self.m_nodes_list:
+            if _node.is_work() and ( _node.get_id == _id):
+                ret = True
+        
+        return ret
     
     # reverse route
     def do_reverse(self):

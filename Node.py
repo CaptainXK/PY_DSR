@@ -477,7 +477,7 @@ class Src_node(Node):
 class Nor_node(Node):
     m_src_node=None
     m_cur_ack = 0
-    m_cur_best_route_list = []
+    m_cur_best_nodes_list = []
 
     def __init__(self, _name, _x, _y, _range):
         # involve base class init
@@ -487,7 +487,7 @@ class Nor_node(Node):
         # replace the src node in msg and send it to real src node
         self.m_src_node=None
         
-        self.m_cur_best_route_list = []
+        self.m_cur_best_nodes_list = []
 
         self.m_cur_ack=0
     
@@ -546,11 +546,97 @@ class Nor_node(Node):
         # do send to pre-node
         self.send_msg(_pre_node, _noti_msg)
 
+    # check rd msg's necessity
+    def check_rd_necessity(self, _rd_route_info, _rd_content):
+        # if current best route nodes list is empty, need forward msg
+        if len(self.m_cur_best_nodes_list) == 0:
+            return True
+        
+        # if some node is offline in current best route nodes list, need forward rd msg
+        if len(_rd_content) > 0:
+            ret = False
+            offline_id = int(_rd_content)
+            # test if offline node is in current best route nodes list
+            for _node in self.m_cur_best_nodes_list:
+                if _node.get_id() == offline_id:
+                    ret = True
+                    break
+            # if offline node is in current best route nodes list, means current best route is no longer valid
+            if ret == True:
+                self.m_cur_best_nodes_list.clear()
+                return True
+            # if offline node is not in current best route nodes list, just test lengths of route in msg and local route 
+            else:
+                len_in_msg = len(_rd_route_info.get_nodes_in_path())
+                len_local = len(self.m_cur_best_nodes_list)
+                # if len of route in msg is shorter than len of local route record 
+                if len_in_msg < len_local:
+                    return True
+                # otherwise, no need forward this rd msg
+                else:
+                    return False
+            
+        # if no offline node information in content, means is a initial rd msg
+        # just test lengths of route in msg and local route
+        # this redundant code is just for easy understanding process logicality
+        len_in_msg = len(_rd_route_info.get_nodes_in_path())
+        len_local = len(self.m_cur_best_nodes_list)
+        # if len of route in msg is shorter than len of local route record 
+        if len_in_msg < len_local:
+            return True
+        # otherwise, no need forward this rd msg
+        else:
+            return False
+
+    # update current best route path through node itself
+    def update_cur_best_route_by_fb(self, _nodes_list):
+        if len(self.m_cur_best_nodes_list) == 0 or ( len(self.m_cur_best_nodes_list) > len(_nodes_list) ):
+        # update current best route nodes list
+            self.m_cur_best_nodes_list.clear()
+            idx = len(_nodes_list) - 1
+            while idx >= 0:
+                self.m_cur_best_nodes_list.append(_nodes_list[idx])
+                idx = idx - 1
+            return True
+        else:
+            return False
+
+    # process fb_msg
+    def process_fb_or_noti_or_ack_msg(self, _msg):
+        # get route info in msg
+        _msg_route_info = _msg.get_route()
+
+        # test if fb msg is not better than current best route record
+        if _msg.get_type() == 3:
+            ret = self.update_cur_best_route_by_fb(_msg_route_info.get_nodes_in_path())
+            if ret == False:
+                return False
+
+        # just forward it
+        
+        # find next hop node
+        _to_node = _msg_route_info.find_next_hop(self)
+
+        if not _to_node:
+            return False
+
+        # do send
+        self.send_msg(_to_node, _msg)
+        return True
+    
     # process rd_msg
     def process_rd_msg(self, _pre_node, _msg):
         # get route info in msg
         _msg_route_info = _msg.get_route()
+        _msg_content = _msg.get_content()
         
+        # check if current rd msg is no need to process
+        if not self.check_rd_necessity(_msg_route_info, _msg_content):
+            if _msg_route_info.get_dst_node() is self:
+                print("%s : dst node has received a route discover msg, but no need to process it"%(self.get_name()))
+                print("len of msg route=%d, len of local record=%d" %(len(_msg_route_info.get_nodes_in_path()), len(self.m_cur_best_nodes_list)))
+            return
+
         # if i am the dst node
         if _msg_route_info.get_dst_node() is self:
             # add my self into route nodes list
@@ -563,15 +649,21 @@ class Nor_node(Node):
             _msg.set_type(3)
 
             #do send
-            self.process_fb_or_noti_or_ack_msg(_msg)
-            print("%s : dst node has received a route discover msg and response"%(self.get_name()))
+            ret = self.process_fb_or_noti_or_ack_msg(_msg)
+            if ret == True:
+                print("%s : dst node has received a better route discover msg and response:"%(self.get_name()))
+                _msg_route_info.show_route()
+
         # if i am not the dst node
         else:
             # check if i am in route info already to avoid loop
             if _msg_route_info.is_in(self):
                 return
+            
+            # just fwd
             else:
                 # broadcast route discover msg to all neighbor nodes but the node that msg came from
+                # add myself into route nodes list
                 _msg_route_info.add_node(self)
                 _nodes_in_path = _msg_route_info.get_nodes_in_path()
 
@@ -594,25 +686,9 @@ class Nor_node(Node):
                     _dup_msg.get_route().set_dst_node(_dst_node)
                     _dup_msg.get_route().set_src_node(_src_node)
 
-                    # do not send to
+                    # do not send to pre_node
                     if not (_to_node is _pre_node):
                         self.send_msg(_to_node, _dup_msg)
-
-    # process fb_msg
-    def process_fb_or_noti_or_ack_msg(self, _msg):
-        # get route info in msg
-        _msg_route_info = _msg.get_route()
-
-        # just forward it
-        
-        # find next hop node
-        _to_node = _msg_route_info.find_next_hop(self)
-
-        if not _to_node:
-            return
-
-        # do send
-        self.send_msg(_to_node, _msg)
 
     # process nor msg
     def process_nor_msg(self, _pre_node, _msg):

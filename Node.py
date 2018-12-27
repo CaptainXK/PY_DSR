@@ -424,6 +424,7 @@ class Src_node(Node):
                 print("%s : next hop node offline, re-build route"%(self.get_name()))
                 self.m_route[_dst_node]=None
                 self.m_rd_pit = 0
+                self.m_last_offline_node_id = _next_hop_node.get_id()
                 continue
             
             # do snd
@@ -478,6 +479,8 @@ class Nor_node(Node):
     m_src_node=None
     m_cur_ack = 0
     m_cur_best_nodes_list = []
+    m_cur_best_pre_route = []
+    m_cur_offline_node_ids = []
 
     def __init__(self, _name, _x, _y, _range):
         # involve base class init
@@ -487,10 +490,14 @@ class Nor_node(Node):
         # replace the src node in msg and send it to real src node
         self.m_src_node=None
         
-        self.m_cur_best_nodes_list = []
-
         self.m_cur_ack=0
     
+        self.m_cur_best_nodes_list = []
+        
+        self.m_cur_best_pre_route = []
+
+        self.m_cur_offline_node_ids = []
+
     # lunch a node
     def node_lunch(self):
         # init threading
@@ -549,28 +556,56 @@ class Nor_node(Node):
     # check rd msg's necessity
     def check_rd_necessity(self, _rd_route_info, _rd_content):
         # if current best route nodes list is empty, need forward msg
-        if len(self.m_cur_best_nodes_list) == 0:
+        if len(self.m_cur_best_pre_route) == 0:
+            self.m_cur_best_pre_route.clear()
+            for _node in _rd_route_info.get_nodes_in_path():
+                self.m_cur_best_pre_route.append(_node)
             return True
+
+        #if self.get_id() == 2:
+        #    print("Debug node")
         
-        # if some node is offline in current best route nodes list, need forward rd msg
+        # if some node is offline in current best pre route, need forward rd msg
         if len(_rd_content) > 0:
             ret = False
+            is_new_offline = True
             offline_id = int(_rd_content)
+
+            # test if it is a new offline 
+            for _id in self.m_cur_offline_node_ids:
+                if _id == offline_id:
+                    is_new_offline = False
+            # if it is a new offline node ,update cur_best_pre_route and add it into record and fwd this rd msg
+            if is_new_offline:
+                self.m_cur_offline_node_ids.append(offline_id)
+                self.m_cur_best_pre_route.clear()
+                for _node in _rd_route_info.get_nodes_in_path():
+                    self.m_cur_best_pre_route.append(_node)
+                return True
+            
             # test if offline node is in current best route nodes list
-            for _node in self.m_cur_best_nodes_list:
+            for _node in self.m_cur_best_pre_route:
                 if _node.get_id() == offline_id:
                     ret = True
                     break
             # if offline node is in current best route nodes list, means current best route is no longer valid
+            # update cur_best_pre_route and fwd rd msg
             if ret == True:
-                self.m_cur_best_nodes_list.clear()
+                self.m_cur_best_pre_route.clear()
+                for _node in _rd_route_info.get_nodes_in_path():
+                    self.m_cur_best_pre_route.append(_node)
                 return True
+            
             # if offline node is not in current best route nodes list, just test lengths of route in msg and local route 
             else:
                 len_in_msg = len(_rd_route_info.get_nodes_in_path())
-                len_local = len(self.m_cur_best_nodes_list)
+                len_local = len(self.m_cur_best_pre_route)
                 # if len of route in msg is shorter than len of local route record 
+                # update cur_best_pre_route and fwd rd msg
                 if len_in_msg < len_local:
+                    self.m_cur_best_pre_route.clear()
+                    for _node in _rd_route_info.get_nodes_in_path():
+                        self.m_cur_best_pre_route.append(_node)
                     return True
                 # otherwise, no need forward this rd msg
                 else:
@@ -580,9 +615,13 @@ class Nor_node(Node):
         # just test lengths of route in msg and local route
         # this redundant code is just for easy understanding process logicality
         len_in_msg = len(_rd_route_info.get_nodes_in_path())
-        len_local = len(self.m_cur_best_nodes_list)
+        len_local = len(self.m_cur_best_pre_route)
         # if len of route in msg is shorter than len of local route record 
+        # update cur_best_pre_route and fwd rd msg
         if len_in_msg < len_local:
+            self.m_cur_best_pre_route.clear()
+            for _node in _rd_route_info.get_nodes_in_path():
+                self.m_cur_best_pre_route.append(_node)
             return True
         # otherwise, no need forward this rd msg
         else:
@@ -606,12 +645,6 @@ class Nor_node(Node):
         # get route info in msg
         _msg_route_info = _msg.get_route()
 
-        # test if fb msg is not better than current best route record
-        if _msg.get_type() == 3:
-            ret = self.update_cur_best_route_by_fb(_msg_route_info.get_nodes_in_path())
-            if ret == False:
-                return False
-
         # just forward it
         
         # find next hop node
@@ -630,15 +663,29 @@ class Nor_node(Node):
         _msg_route_info = _msg.get_route()
         _msg_content = _msg.get_content()
         
-        # check if current rd msg is no need to process
-        if not self.check_rd_necessity(_msg_route_info, _msg_content):
-            if _msg_route_info.get_dst_node() is self:
-                print("%s : dst node has received a route discover msg, but no need to process it"%(self.get_name()))
-                print("len of msg route=%d, len of local record=%d" %(len(_msg_route_info.get_nodes_in_path()), len(self.m_cur_best_nodes_list)))
-            return
-
         # if i am the dst node
         if _msg_route_info.get_dst_node() is self:
+            # test a re-build rd msg
+            if len(_msg_content) > 0:
+                offline_id = int(_msg_content)
+                is_new_offline = True
+                is_on_path = False
+                # test if it is a new offline node
+                for _id in self.m_cur_offline_node_ids:
+                    if _id == offline_id:
+                        is_new_offline = False
+                # if it is a new offline node, test if it is on the current best route path
+                if is_new_offline:
+                    self.m_cur_offline_node_ids.append(offline_id)
+                    for _node in self.m_cur_best_nodes_list:
+                        if _node.get_id() == offline_id:
+                            is_on_path = True
+                            break
+                
+                # if new offline node is on the route path, clear current best nodes list
+                if is_new_offline and is_on_path:
+                    self.m_cur_best_nodes_list.clear()
+
             # add my self into route nodes list
             _msg_route_info.add_node(self)
 
@@ -647,17 +694,28 @@ class Nor_node(Node):
 
             # modify msg's type to feedback msg
             _msg.set_type(3)
+            
+            # test if fb msg is not better than current best route record
+            if _msg.get_type() == 3:
+                ret = self.update_cur_best_route_by_fb(_msg_route_info.get_nodes_in_path())
+                if ret == False:
+                    print("%s : dst node has received a route discover msg but drop it:"%(self.get_name()))
+                    _msg_route_info.show_route()
+                    return
 
             #do send
-            ret = self.process_fb_or_noti_or_ack_msg(_msg)
-            if ret == True:
-                print("%s : dst node has received a better route discover msg and response:"%(self.get_name()))
-                _msg_route_info.show_route()
+            self.process_fb_or_noti_or_ack_msg(_msg)
+            print("%s : dst node has received a better route discover msg and response:"%(self.get_name()))
+            _msg_route_info.show_route()
 
         # if i am not the dst node
         else:
             # check if i am in route info already to avoid loop
             if _msg_route_info.is_in(self):
+                return
+           
+            # check if current rd msg is no need to process
+            if not self.check_rd_necessity(_msg_route_info, _msg_content):
                 return
             
             # just fwd

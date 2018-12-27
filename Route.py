@@ -114,8 +114,9 @@ class Route_path:
     def id_is_in(self, _id):
         ret = False
         for _node in self.m_nodes_list:
-            if _node.is_work() and ( _node.get_id == _id):
+            if _node.is_work() and ( _node.get_id() == _id):
                 ret = True
+                break
         
         return ret
     

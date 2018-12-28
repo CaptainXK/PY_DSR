@@ -187,6 +187,9 @@ class Src_node(Node):
     m_last_ack=-1
     m_re_send=False
     m_last_offline_node_id=-1
+    m_build_start_time=0
+    m_build_stop_time=0
+    m_build_tot_time=0
 
     def __init__(self, _name, _x, _y, _range):
         # involve base class init
@@ -200,6 +203,9 @@ class Src_node(Node):
         self.m_last_ack=-1
         self.m_re_send=False
         self.m_last_offline_node_id=-1
+        self.m_build_start_time=0
+        self.m_build_stop_time=0
+        self.m_build_tot_time=0
 
     # add a dst_node
     def add_dst_node(self, _node):
@@ -254,6 +260,9 @@ class Src_node(Node):
 
                 # add into _msgs
                 _msgs.append(_rd_msg)
+                
+                # update build start time
+                self.m_build_start_time = int(round(time.time()))
             
             # do send to one neighborhood node
             if len(_msgs) > 0:
@@ -323,6 +332,13 @@ class Src_node(Node):
 
                         # get dst node
                         _dst_node = _route_info.get_dst_node()
+
+                        # update tot build time
+                        if _msg.get_type() == 3:
+                            # update build tot time
+                            self.m_build_stop_time = int(round(time.time()))
+                            self.m_build_tot_time = self.m_build_stop_time - self.m_build_start_time
+                            print("******Tot build time = %d ms******"%(self.m_build_tot_time))
 
                         # a node noti msg
                         if _msg.get_type() == 4:

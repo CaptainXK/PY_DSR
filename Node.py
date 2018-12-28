@@ -186,6 +186,9 @@ class Src_node(Node):
     m_cur_seq=-1
     m_last_ack=-1
     m_re_send=False
+    m_build_start_time=0
+    m_build_stop_time=0
+    m_build_tot_time=0
 
     def __init__(self, _name, _x, _y, _range):
         # involve base class init
@@ -198,6 +201,9 @@ class Src_node(Node):
         self.m_cur_seq=-1
         self.m_last_ack=-1
         self.m_re_send=False
+        self.m_build_start_time=0
+        self.m_build_stop_time=0
+        self.m_build_tot_time=0
 
     # add a dst_node
     def add_dst_node(self, _node):
@@ -253,6 +259,9 @@ class Src_node(Node):
             if len(_msgs) > 0:
                 _snd_pipe.send_all(_msgs)
                 print("%s : I just sended one rd msg to %s"%(self.get_name(), _node.get_name()))
+            
+            # update build start time
+            self.m_build_start_time = int(round(time.time()))
 
     # process route node offline
     def process_route_offline(self, _noti_msg):
@@ -313,6 +322,13 @@ class Src_node(Node):
 
                         # get dst node
                         _dst_node = _route_info.get_dst_node()
+
+                        # update tot build time
+                        if _msg.get_type() == 3:
+                            # update build tot time
+                            self.m_build_stop_time = int(round(time.time()))
+                            self.m_build_tot_time = self.m_build_stop_time - self.m_build_start_time
+                            print("******Tot build time = %d ms******"%(self.m_build_tot_time))
 
                         # a node noti msg
                         if _msg.get_type() == 4:
